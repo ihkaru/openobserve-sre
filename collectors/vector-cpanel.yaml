@@ -1,0 +1,48 @@
+# ==============================================================================
+# Vector Configuration for cPanel (Shared/VPS Ingestion)
+# ==============================================================================
+# Tails PHP error_log and web server logs without needing root access.
+# Run as standalone binary: vector --config vector-cpanel.yaml
+# ==============================================================================
+
+sources:
+  cpanel_php_errors:
+    type: file
+    include:
+      - "/home/*/public_html/error_log"
+      - "/home/*/public_html/*/error_log"
+      - "/home/*/logs/*_error_log"
+    read_from: "end"
+
+transforms:
+  parse_cpanel_log:
+    type: remap
+    inputs:
+      - cpanel_php_errors
+    source: |
+      .platform = "cpanel"
+      .environment = "production"
+      
+      # Extract cPanel user and app directory from file path
+      parts = split(to_string!(.file), "/")
+      if length(parts) > 2 {
+        .cpanel_user = parts[2]
+      }
+      .app_name = get(.parts, [4]) ?? "default-cpanel-app"
+      
+      # Default level for PHP error_log is error
+      .level = "error"
+
+sinks:
+  openobserve_stream:
+    type: http
+    inputs:
+      - parse_cpanel_log
+    uri: "https://<OPENOBSERVE_DOMAIN>:5080/api/default/cpanel_apps/_json"
+    method: post
+    auth:
+      strategy: basic
+      user: "admin@yourdomain.com"
+      password: "<OPENOBSERVE_PASSWORD_OR_TOKEN>"
+    encoding:
+      codec: json

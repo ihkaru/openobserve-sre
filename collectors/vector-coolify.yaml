@@ -1,0 +1,48 @@
+# ==============================================================================
+# Vector Configuration for Coolify (Docker Host Ingestion)
+# ==============================================================================
+# Reads logs from all Docker containers on the Coolify host via docker.sock
+# Transforms container metadata (name, image) into structured OpenObserve tags.
+# ==============================================================================
+
+sources:
+  docker_logs:
+    type: docker_logs
+    exclude_containers:
+      - openobserve-sre
+      - vector-coolify
+
+transforms:
+  parse_docker_metadata:
+    type: remap
+    inputs:
+      - docker_logs
+    source: |
+      .platform = "coolify"
+      .environment = "production"
+      
+      # Extract app name from container name (e.g. /my-app-xyz -> my-app)
+      .app_name = replace(to_string!(.container_name), r'^/', "")
+      
+      # Detect log level from message text
+      if contains(to_string!(.message), "ERROR") || contains(to_string!(.message), "Fatal error") || contains(to_string!(.message), "Exception") {
+        .level = "error"
+      } else if contains(to_string!(.message), "WARN") {
+        .level = "warn"
+      } else {
+        .level = "info"
+      }
+
+sinks:
+  openobserve_stream:
+    type: http
+    inputs:
+      - parse_docker_metadata
+    uri: "http://<OPENOBSERVE_HOST>:5080/api/default/coolify_apps/_json"
+    method: post
+    auth:
+      strategy: basic
+      user: "admin@yourdomain.com"
+      password: "<OPENOBSERVE_PASSWORD_OR_TOKEN>"
+    encoding:
+      codec: json

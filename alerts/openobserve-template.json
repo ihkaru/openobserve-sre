@@ -1,0 +1,5 @@
+{
+  "name": "SRE_Incident_Webhook_Template",
+  "type": "webhook",
+  "body": "{\n  \"alert_name\": \"{alert_name}\",\n  \"stream_name\": \"{stream_name}\",\n  \"timestamp\": \"{timestamp}\",\n  \"alert_count\": {alert_count},\n  \"alert_url\": \"{alert_url}\",\n  \"records\": {rows:5}\n}"
+}

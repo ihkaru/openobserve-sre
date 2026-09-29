@@ -1,0 +1,9 @@
+.git/
+.gitignore
+data/
+target/
+shipper/target/
+*.md
+docs/
+collectors/
+alerts/

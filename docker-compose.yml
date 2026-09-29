@@ -1,0 +1,63 @@
+services:
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:v0.14.5
+    container_name: openobserve-sre
+    restart: unless-stopped
+    environment:
+      - ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL:-admin@yourdomain.com}
+      - ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD:-ChangeThisPasswordSecure!}
+      - ZO_DATA_DIR=/data
+      - ZO_HTTP_PORT=5080
+      # Allow webhooks to private networks, loopback, and docker networks
+      - ZO_SKIP_SSRF_CHECKS=true
+      - ZO_SSRF_ALLOW_LOOPBACK=true
+    ports:
+      - "${OPENOBSERVE_PORT:-5080}:5080"
+    volumes:
+      - openobserve_data:/data
+    networks:
+      - sre_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  context-shipper:
+    build:
+      context: ./shipper
+      dockerfile: Dockerfile
+    container_name: openobserve-shipper
+    restart: unless-stopped
+    environment:
+      - CONFIG_PATH=/app/config.yaml
+      - APPS_DIR=/app/apps.d
+      - PORT=8089
+      - RUST_LOG=info
+      - AGENT_TARGET_URL=${AGENT_TARGET_URL:-http://localhost:8000/webhook/agent-remediation}
+      - AGENT_AUTH_TOKEN=${AGENT_AUTH_TOKEN:-}
+    ports:
+      - "${SHIPPER_PORT:-8089}:8089"
+    volumes:
+      - ./shipper/config.yaml:/app/config.yaml:ro
+      - ./apps.d:/app/apps.d:ro
+    networks:
+      - sre_net
+    depends_on:
+      openobserve:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8089/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  openobserve_data:
+    driver: local
+
+networks:
+  sre_net:
+    driver: bridge

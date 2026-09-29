@@ -1,0 +1,38 @@
+{
+  "event_id": "evt_sample_2026_09",
+  "app_metadata": {
+    "app_name": "billing-service",
+    "environment": "production",
+    "platform": "coolify",
+    "language": "nodejs",
+    "framework": "express",
+    "repository": {
+      "provider": "github",
+      "url": "https://github.com/myorg/billing-service",
+      "default_branch": "main",
+      "target_branch": "hotfix/auto-heal-evt_sample_2026_09"
+    }
+  },
+  "incident": {
+    "error_type": "TypeError",
+    "error_message": "Cannot read properties of undefined (reading 'rate')",
+    "file_path": "src/services/currency.ts",
+    "line_number": 42,
+    "stack_trace": [
+      "at CurrencyConverter.convert (src/services/currency.ts:42:18)",
+      "at InvoiceService.calculate (src/services/invoice.ts:110:24)",
+      "at processTicksAndRejections (node:internal/process/task_queues:95:5)"
+    ]
+  },
+  "telemetry_context": {
+    "surrounding_logs": [
+      "2026-09-30T06:30:10Z [INFO] Fetching exchange rates from cache",
+      "2026-09-30T06:30:11Z [WARN] Cache miss for currency pair USD_IDR",
+      "2026-09-30T06:30:11Z [ERROR] TypeError: Cannot read properties of undefined (reading 'rate') at src/services/currency.ts:42"
+    ]
+  },
+  "remediation_instructions": {
+    "objective": "Add null check and fallback exchange rate provider if cache or primary API fails.",
+    "verification_command": "npm test"
+  }
+}
