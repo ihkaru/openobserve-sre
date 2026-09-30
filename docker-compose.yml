@@ -37,6 +37,7 @@ services:
       - RUST_LOG=info
       - AGENT_TARGET_URL=${AGENT_TARGET_URL:-http://localhost:8000/webhook/agent-remediation}
       - AGENT_AUTH_TOKEN=${AGENT_AUTH_TOKEN:-}
+      - DEFAULT_GITHUB_ORG=${DEFAULT_GITHUB_ORG:-ihkaru}
     ports:
       - "${SHIPPER_PORT:-8089}:8089"
     volumes:

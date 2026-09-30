@@ -120,13 +120,14 @@ impl AppRegistry for YamlAppRegistry {
             return meta.clone();
         }
 
+        let default_org = std::env::var("DEFAULT_GITHUB_ORG").unwrap_or_else(|_| "ihkaru".to_string());
         AppMetadata {
             app_name: app_name.to_string(),
             environment: "production".to_string(),
             platform: "coolify".to_string(),
             language: "unknown".to_string(),
             framework: "unknown".to_string(),
-            repo_url: format!("https://github.com/myorg/{}", app_name),
+            repo_url: format!("https://github.com/{}/{}", default_org, app_name),
             default_branch: "main".to_string(),
             verification_command: "npm test".to_string(),
         }

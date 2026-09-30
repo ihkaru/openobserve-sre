@@ -14,7 +14,7 @@
 - [Why This Project Exists (The Problem)](#-why-this-project-exists-the-problem)
 - [System Architecture (Event-Driven Flow)](#-system-architecture-event-driven-flow)
 - [Core Features](#-core-features)
-- [🛡️ Mitigating Configuration Explosion: Modular `apps.d/`](#️-mitigating-configuration-explosion-modular-appsd)
+- [⚙️ Application Registry & Convention over Configuration](#️-application-registry--convention-over-configuration)
 - [📡 Coding Agent Webhook Contract Specification](#-coding-agent-webhook-contract-specification)
 - [🤖 Setting Up Your Coding Agent Environment](#-setting-up-your-coding-agent-environment)
 - [🚀 Deployment on Coolify via GitHub App Auto-Deploy](#-deployment-on-coolify-via-github-app-auto-deploy)
@@ -84,33 +84,34 @@ flowchart TD
 
 ---
 
-## 🛡️ Mitigating Configuration Explosion: Modular `apps.d/`
+## ⚙️ Application Registry & Convention over Configuration
 
-Managing 50 to 100 services in a single monolithic `config.yaml` file creates merge conflicts and introduces a single point of failure where a YAML indentation error breaks monitoring for all applications.
+The SRE Hub adopts a **Zero-Config Default** philosophy:
+* When an incoming exception from service `pos-kasir` is received without an explicit configuration file, the Hub dynamically derives:
+  - **Repository URL:** `https://github.com/<DEFAULT_GITHUB_ORG>/<app_name>` (organization configurable via `DEFAULT_GITHUB_ORG`, defaults to `ihkaru`).
+  - **Default Branch:** `main`.
+  - **Language & Test Command:** Inferred automatically from the parsed stack trace:
+    - PHP Fatal Errors / Exceptions → `php` (`php artisan test`)
+    - Python Exceptions → `python` (`pytest`)
+    - Go Runtime Panics → `go` (`go test ./...`)
+    - Node / TypeScript Exceptions → `nodejs` (`npm test`)
 
-This repository enforces a modular **"1 App = 1 Standalone File"** pattern inside the [`apps.d/`](apps.d/) directory:
+### Custom Application Overrides (`apps.d/`)
+For non-standard repositories (such as monorepos, specific release branches, or custom test runners), you can define an optional standalone YAML file in [`apps.d/`](apps.d/):
 
-```text
-apps.d/
-├── toko-online-api.yaml      # Configuration for Service 1
-├── pos-kasir.yaml            # Configuration for Service 2
-├── billing-service.yaml      # Configuration for Service 3
-└── ... (scales cleanly to hundreds of independent files)
-```
-
-Example configuration in [`apps.d/toko-online-api.yaml`](apps.d/toko-online-api.yaml):
 ```yaml
-app_name: toko-online-api
+# apps.d/billing-service.yaml
+app_name: billing-service
 environment: production
-platform: cpanel
-language: php
-framework: laravel
-repo_url: https://github.com/myorg/toko-online-api
+platform: coolify
+language: python
+framework: fastapi
+repo_url: https://github.com/ihkaru/billing-service
 default_branch: main
-verification_command: php artisan test
+verification_command: pytest tests/unit/
 ```
 
-The Rust Shipper engine automatically scans and loads all `.yaml` files in `apps.d/` upon startup.
+Files placed in `apps.d/` are loaded dynamically on startup and take precedence over default conventions.
 
 ---
 

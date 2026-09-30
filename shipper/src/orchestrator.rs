@@ -98,6 +98,25 @@ impl IncidentOrchestrator {
             })
             .collect();
 
+        let (inferred_lang, inferred_cmd) = match parsed.error_type.as_str() {
+            "PHP Fatal Error" | "PHP Exception" => ("php", "php artisan test"),
+            "Python Exception" => ("python", "pytest"),
+            "Go Runtime Panic" => ("go", "go test ./..."),
+            _ => ("nodejs", "npm test"),
+        };
+
+        let language = if app_meta.language != "unknown" {
+            app_meta.language
+        } else {
+            inferred_lang.to_string()
+        };
+
+        let verification_command = if app_meta.verification_command != "npm test" || app_meta.framework != "unknown" {
+            app_meta.verification_command
+        } else {
+            inferred_cmd.to_string()
+        };
+
         // 5. Assemble Standard Agent-Agnostic Payload
         Some(IncidentContext {
             event_id: event_id.clone(),
@@ -114,7 +133,7 @@ impl IncidentOrchestrator {
                     .and_then(|v| v.as_str())
                     .unwrap_or(&app_meta.platform)
                     .to_string(),
-                language: app_meta.language,
+                language,
                 framework: app_meta.framework,
                 repository: RepositoryInfo {
                     provider: "github".to_string(),
@@ -145,7 +164,7 @@ impl IncidentOrchestrator {
             },
             remediation_instructions: RemediationInstructions {
                 objective: format!("Resolve {} in {}:{}", parsed.error_type, parsed.file_path, parsed.line_number),
-                verification_command: app_meta.verification_command,
+                verification_command,
             },
         })
     }
