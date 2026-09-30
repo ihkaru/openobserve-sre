@@ -10,16 +10,63 @@
 
 ---
 
+## ⚡ Quickstart (Up & Running in 2 Minutes)
+
+Get the complete SRE Hub running and tested locally or on your server in 3 simple steps:
+
+### 1. Clone & Start the Stack
+```bash
+git clone https://github.com/ihkaru/openobserve-sre.git
+cd openobserve-sre
+docker compose up -d --build
+```
+* Both **OpenObserve** (Port `5080`) and the **Rust Context Shipper** (Port `8089`) are now live.
+* Open your browser at `http://localhost:5080` (Default credentials from `docker-compose.yml`: Email `admin@yourdomain.com`, Password `ChangeThisPasswordSecure!`).
+
+### 2. Verify Service Health
+```bash
+curl http://localhost:8089/healthz
+```
+*Expected response:*
+```json
+{"active_cached_incidents":0,"runtime":"rust","service":"openobserve-sre-shipper","status":"ok"}
+```
+
+### 3. Send a Mock Incident Alert (Smoke Test)
+Simulate an exception from a monitored container to see the Shipper parse the stack trace, enforce deduplication, and dispatch to your agent:
+```bash
+curl -X POST http://localhost:8089/webhook/openobserve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "stream_name": "coolify_apps",
+    "alert_name": "test_php_fatal",
+    "records": [
+      {
+        "app_name": "toko-online-api",
+        "message": "PHP Fatal error: Uncaught Error: Call to undefined method Order::calculate() in /var/www/html/app/Services/OrderService.php on line 84"
+      }
+    ]
+  }'
+```
+*Expected response:*
+```json
+{"app_name":"toko-online-api","event_id":"evt_1727678900_a1b2c3","status":"dispatched"}
+```
+> [!TIP]
+> **Circuit Breaker Test:** Execute the exact same `curl` command again. The Shipper will immediately return `{"status":"throttled_or_empty"}` — protecting your coding agent from repeating error storms and token burnout!
+
+---
+
 ## 📑 Table of Contents
+- [⚡ Quickstart (Up & Running in 2 Minutes)](#-quickstart-up--running-in-2-minutes)
 - [Why This Project Exists (The Problem)](#-why-this-project-exists-the-problem)
 - [System Architecture (Event-Driven Flow)](#-system-architecture-event-driven-flow)
 - [Core Features](#-core-features)
+- [📦 Zero-Touch Log Collection (Coolify & cPanel)](#-zero-touch-log-collection-coolify--cpanel)
 - [⚙️ Application Registry & Convention over Configuration](#️-application-registry--convention-over-configuration)
 - [📡 Coding Agent Webhook Contract Specification](#-coding-agent-webhook-contract-specification)
 - [🤖 Setting Up Your Coding Agent Environment](#-setting-up-your-coding-agent-environment)
 - [🚀 Deployment on Coolify via GitHub App Auto-Deploy](#-deployment-on-coolify-via-github-app-auto-deploy)
-- [⚡ Local Quickstart (5 Minutes)](#-local-quickstart-5-minutes)
-- [📦 Zero-Touch Log Collection (Coolify & cPanel)](#-zero-touch-log-collection-coolify--cpanel)
 - [🧪 Testing & Verification](#-testing--verification)
 - [📚 Documentation Reference](#-documentation-reference)
 
@@ -46,14 +93,14 @@ This architecture maintains a strict separation of concerns between the **Sensor
 ```mermaid
 flowchart TD
     subgraph Apps ["20+ Production Applications (Zero-Touch Ingestion)"]
-        CP[cPanel Shared / VPS<br/>PHP / Node.js / error_log]
+        CP[cPanel Shared / VPS<br/>PHP / Node.js / Python / error_log]
         CL[Coolify Docker Containers<br/>stdout / stderr]
     end
 
     subgraph Hub ["openobserve-sre (The Sensor)"]
         V[Vector Log Collectors] --> OO[(OpenObserve Engine)]
         OO -->|SQL Stream Alert < 15s| RS[Rust Context Shipper<br/>(Axum + Tokio)]
-        RS -->|apps.d/ Scan| REG[Modular App Registry]
+        RS -->|Zero-Config / apps.d/| REG[App Registry]
         RS -->|Deduplication Cache 30m| DEDUP{Duplicate?}
         DEDUP -->|Yes| DROP[Drop / Throttle]
         DEDUP -->|No| PACK[Pack Standard Context JSON]
@@ -79,8 +126,31 @@ flowchart TD
 * **⚡ Real-Time Detection (< 15 Seconds):** Leverages OpenObserve SQL Stream Alerting to catch fatal errors and unhandled exceptions instantly.
 * **🛡️ Automatic Circuit Breaker & Deduplication:** Prevents agent invocation storms and token burnout when dozens of users encounter the same exception within a 30-minute window.
 * **🔌 100% Agent-Agnostic:** Emits a standardized JSON contract over HTTP POST. Compatible with any autonomous agent runner without vendor lock-in.
-* **📦 Modular Registry (`apps.d/`):** Scale from 20 to 100+ services by adding standalone files without modifying shared configurations.
+* **⚙️ Zero-Config Default:** Automatically derives GitHub repositories, languages, and test runners from container names and stack traces without requiring configuration files.
 * **🚀 Zero-Touch Log Collection:** Stream logs directly from Coolify Docker sockets and cPanel `error_log` files without modifying target application source code.
+
+---
+
+## 📦 Zero-Touch Log Collection (Coolify & cPanel)
+
+You do **NOT** need to install SDKs or modify target application code.
+
+### A. Applications on Coolify (Docker Containers)
+Run a Vector container on your Coolify host using [`collectors/vector-coolify.yaml`](collectors/vector-coolify.yaml):
+```bash
+docker run -d \
+  --name vector-coolify \
+  --restart unless-stopped \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  -v $(pwd)/collectors/vector-coolify.yaml:/etc/vector/vector.yaml:ro \
+  timberio/vector:latest-alpine --config /etc/vector/vector.yaml
+```
+
+### B. Applications on cPanel (Shared / VPS)
+Run a standalone Vector binary under your cPanel account using [`collectors/vector-cpanel.yaml`](collectors/vector-cpanel.yaml):
+```bash
+vector --config collectors/vector-cpanel.yaml &
+```
 
 ---
 
@@ -131,7 +201,7 @@ The Rust Shipper delivers an HTTP `POST` to `AGENT_TARGET_URL` with a context-ri
     "framework": "laravel",
     "repository": {
       "provider": "github",
-      "url": "https://github.com/myorg/toko-online-api",
+      "url": "https://github.com/ihkaru/toko-online-api",
       "default_branch": "main",
       "target_branch": "hotfix/auto-heal-evt_1727678900_a1b2c3"
     }
@@ -170,81 +240,21 @@ Detailed technical specifications covering ephemeral workspace sandboxing, job q
 This repository is configured for native deployment on Coolify using the official GitHub App integration with continuous delivery on pushes to `main`.
 
 ### Coolify Setup Steps:
-1. **Push this repository to GitHub:**
-   ```bash
-   cd /home/server/projects/openobserve-sre
-   git push origin main
-   ```
-2. **Create New Resource in Coolify:**
+1. **Create New Resource in Coolify:**
    * Navigate to your Coolify project dashboard → Click **+ New Resource**.
    * Select **Docker Compose Application**.
    * Choose your **GitHub App** integration → Select `ihkaru/openobserve-sre` with branch `main`.
-3. **Configure Environment Variables:**
+2. **Configure Environment Variables:**
    * Copy variables from [`.env.example`](.env.example) into Coolify's **Environment Variables** tab:
      - `ZO_ROOT_USER_EMAIL`: OpenObserve administrator email.
      - `ZO_ROOT_USER_PASSWORD`: OpenObserve administrator password.
      - `AGENT_TARGET_URL`: Webhook URL of your coding agent worker.
-     - `AGENT_AUTH_TOKEN`: Optional secret Bearer token.
-4. **Deploy:**
+     - `DEFAULT_GITHUB_ORG`: Default GitHub username / organization (defaults to `ihkaru`).
+3. **Deploy:**
    * Click **Deploy** in Coolify.
    * Coolify provisions OpenObserve with persistent named storage (`openobserve_data`) and builds the lightweight Rust Shipper image (~15 MB).
-5. **Continuous Deployment Active:**
-   * Any future `git push` adding or modifying files in `apps.d/` triggers a seamless rolling update in Coolify with zero downtime!
-
----
-
-## ⚡ Local Quickstart (5 Minutes)
-
-To run the full stack locally for testing:
-
-```bash
-cd /home/server/projects/openobserve-sre
-
-# 1. Start OpenObserve and Rust Context Shipper
-docker compose up -d --build
-
-# 2. Verify health status
-curl http://localhost:8089/healthz
-# Output: {"active_cached_incidents":0,"runtime":"rust","service":"openobserve-sre-shipper","status":"ok"}
-
-# 3. Simulate an Incident Alert (Smoke Test)
-curl -X POST http://localhost:8089/webhook/openobserve \
-  -H "Content-Type: application/json" \
-  -d '{
-    "stream_name": "coolify_apps",
-    "alert_name": "test_php_fatal",
-    "records": [
-      {
-        "app_name": "toko-online-api",
-        "message": "PHP Fatal error: Uncaught Error: Call to undefined method Order::calculate() in /var/www/html/app/Services/OrderService.php on line 84"
-      }
-    ]
-  }'
-```
-*Expected response:* `{"app_name":"toko-online-api","event_id":"evt_...","status":"dispatched"}`.
-
----
-
-## 📦 Zero-Touch Log Collection (Coolify & cPanel)
-
-You do **NOT** need to install SDKs or modify target application code.
-
-### A. Applications on Coolify (Docker Containers)
-Run a Vector container on your Coolify host using [`collectors/vector-coolify.yaml`](collectors/vector-coolify.yaml):
-```bash
-docker run -d \
-  --name vector-coolify \
-  --restart unless-stopped \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
-  -v $(pwd)/collectors/vector-coolify.yaml:/etc/vector/vector.yaml:ro \
-  timberio/vector:latest-alpine --config /etc/vector/vector.yaml
-```
-
-### B. Applications on cPanel (Shared / VPS)
-Run a standalone Vector binary under your cPanel account using [`collectors/vector-cpanel.yaml`](collectors/vector-cpanel.yaml):
-```bash
-vector --config collectors/vector-cpanel.yaml &
-```
+4. **Continuous Deployment Active:**
+   * Any future `git push` triggers a seamless rolling update in Coolify with zero downtime!
 
 ---
 
