@@ -1,23 +1,23 @@
-# 📐 Arsitektur Sistem: OpenObserve SRE Hub (Agent-Agnostic)
+# 📐 System Architecture: OpenObserve SRE Hub (Agent-Agnostic)
 
-Dokumen ini menjelaskan arsitektur teknis dari repositori **`openobserve-sre`** sebagai *Observability Hub & Telemetry Gateway*. Dokumen ini juga mengulas strategi pengumpulan log dari 20+ aplikasi di cPanel dan Coolify, prinsip *Agent-Agnostic*, serta integrasi dengan **Aina** (melalui ekosistem AGY Mesh).
+Dokumen ini menjelaskan arsitektur teknis dari repositori **`openobserve-sre`** sebagai *Observability Hub & Telemetry Gateway*. Dokumen ini mengulas strategi pengumpulan log dari 20+ aplikasi di cPanel dan Coolify, prinsip *Agent-Agnostic*, serta kontrak data dengan **Coding Agent API**.
 
 ---
 
-## 1. Filosofi: Pemisahan Sensor (SRE Hub) dan Aktor (Aina / Coding Agent)
+## 1. Filosofi: Pemisahan Sensor (SRE Hub) dan Aktor (Coding Agent)
 
-Salah satu kelemahan sistem self-healing konvensional adalah *tight coupling* antara sistem pemantau (*monitoring*) dengan bot perbaikan kode. Jika model atau agent diganti, seluruh sistem observabilitas harus dirombak.
+Salah satu kelemahan sistem self-healing konvensional adalah *tight coupling* antara sistem pemantau (*monitoring*) dengan agen perbaikan kode. Jika model atau agent diganti, seluruh sistem observabilitas harus dirombak.
 
 Di repositori ini:
 * **`openobserve-sre` bertindak sebagai RADAR / SENSOR:**
   * Mengumpulkan telemetry (log, metrik, traces) dari 20+ aplikasi heterogen secara *zero-touch*.
   * Mengidentifikasi anomali dan *fatal errors* menggunakan SQL real-time stream.
-  * Menjalankan **Deduplication & Circuit Breaking** (agar tidak membakar token jika terjadi lonjakan error).
-  * Mengemas konteks insiden (*breadcrumbs log*, baris file kode, target repositori) menjadi **Standard Problem Payload**.
-  * Menyediakan **OpenObserve MCP (Model Context Protocol)** agar agent dapat menanyakan log runtime secara interaktif.
-* **Aina (atau Agent Apa Pun) bertindak sebagai MEKANIK:**
-  * Menerima payload standar via webhook.
-  * Menjalankan penalaran (*root cause analysis*), membuat branch hotfix, menulis unit test reproduksi, memperbaiki kode, dan membuka PR di GitHub.
+  * Menjalankan **Deduplication & Circuit Breaking** (agar tidak membakar token jika terjadi lonjakan error berulang).
+  * Mengemas konteks insiden (*breadcrumbs log*, baris file kode, target repositori, perintah tes) menjadi **Standard Problem Payload**.
+  * Menyediakan **OpenObserve MCP (Model Context Protocol)** agar agent dapat menanyakan log runtime secara interaktif jika diperlukan.
+* **Autonomous Coding Agent bertindak sebagai MEKANIK (Aktor Independen):**
+  * Menerima payload standar via webhook HTTP POST.
+  * Menjalankan penalaran (*root cause analysis*), membuat branch hotfix, mereproduksi masalah, memperbaiki kode, dan membuka PR di GitHub.
   * Meminta persetujuan rilis ke solo founder via WhatsApp/Telegram sebelum trigger deploy.
 
 ```mermaid
@@ -31,19 +31,19 @@ flowchart TD
         direction TB
         V[Vector Collectors] --> O2[(OpenObserve Engine)]
         O2 --> SQL[SQL Alert Engine<br/>Detect 500 / Fatal in < 15s]
-        SQL --> Shipper[Context Shipper & Deduplicator<br/>(Python/FastAPI Service)]
-        GH_API[(GitHub API)] -->|Source Snippet Context| Shipper
+        SQL --> Shipper[Rust Context Shipper<br/>(Axum + Tokio)]
+        Shipper --> AppReg[apps.d/ Modular Registry]
     end
 
     subgraph Consumers ["Agent-Agnostic Consumers"]
         direction TB
-        Shipper -->|Standard JSON Payload| AINA[Aina via AGY Mesh<br/>(Primary Coding Agent)]
-        Shipper -.->|Alternatif: REST Webhook| EXT[Claude Code / OpenHands / GitHub Actions]
+        Shipper -->|Standard JSON Payload| AGENT[Autonomous Coding Agent<br/>(Webhook Receiver / Runner)]
+        Shipper -.->|Plug & Play| OTHERS[Claude Code / OpenHands / Cursor / CI]
     end
 
     subgraph Remediation ["Resolution & Deployment"]
-        AINA -->|Open Pull Request| REPO[GitHub / GitLab 20+ Repos]
-        AINA -->|Interactive Alert & 1-Tap Button| WA[Solo Founder (WhatsApp / Telegram)]
+        AGENT -->|Open Pull Request| REPO[GitHub / GitLab 20+ Repos]
+        AGENT -->|Interactive Alert & 1-Tap Button| WA[Solo Founder (WhatsApp / Telegram)]
         WA -->|Tap 'Approve'| DEP[Coolify API Webhook / cPanel Git Pull]
     end
 
@@ -68,10 +68,10 @@ Pertanyaan arsitektur: **"Apakah observabilitas bawaan aplikasi yang dimaintain 
      - **Stack Trace & Breadcrumbs:** Diambil dari OpenObserve (diteruskan dari log container Docker di Coolify dan `error_log` di cPanel).
      - **Source Code State:** Diambil langsung dari GitHub API berdasarkan branch produksi / commit hash.
      - **Container State:** Diambil dari status Coolify/Docker daemon (apakah OOMKilled, exit code, restart count).
-   * *Hasil:* **85–90% bug kode (null pointer, syntax error, undefined array key, query exception) dapat diperbaiki tuntas oleh Aina hanya bermodalkan Tier 1 ini tanpa perlu menyentuh kode aplikasi!**
+   * *Hasil:* **85–90% bug kode (null pointer, syntax error, undefined array key, query exception) dapat diperbaiki tuntas oleh coding agent hanya bermodalkan Tier 1 ini tanpa perlu menyentuh kode aplikasi!**
 
 3. **Tier 2 (Out-of-Band Introspection - Hanya Jika Sangat Dibutuhkan):**
-   * Jika Aina butuh memeriksa kondisi database (misal: status migrasi tabel), gunakan eksekusi CLI aman via container/SSH (contoh: `docker exec <container> php artisan migrate:status`), **bukan melalui HTTP request publik**.
+   * Jika agent butuh memeriksa kondisi database (misal: status migrasi tabel), gunakan eksekusi CLI aman via container/SSH (contoh: `docker exec <container> php artisan migrate:status`), **bukan melalui HTTP request publik**.
 
 ---
 
@@ -79,24 +79,25 @@ Pertanyaan arsitektur: **"Apakah observabilitas bawaan aplikasi yang dimaintain 
 
 ### A. OpenObserve Engine (`docker-compose.yml`)
 * Single binary berbasis Rust, sangat efisien (RAM < 200 MB untuk beban puluhan aplikasi).
-* Menyimpan log dalam format columnar Parquet (bisa di-mount ke disk lokal atau S3).
-* Menyediakan UI web terpusat untuk mencari log di seluruh 20 aplikasi.
+* Menyimpan log dalam format columnar Parquet dengan volume persisten `openobserve_data`.
+* Menyediakan UI web terpusat untuk mencari log di seluruh 20+ aplikasi.
 
 ### B. Vector Collectors (`collectors/`)
 * **Coolify Collector (`vector-coolify.yaml`):** Membaca `/var/run/docker.sock`, otomatis melabeli nama container sebagai `app_name`, dan mengalirkan log ke OpenObserve via HTTP ingestion.
 * **cPanel Collector (`vector-cpanel.yaml`):** Memantau `~/public_html/error_log` dan Apache vhost log secara non-intrusif.
 
 ### C. Context Shipper & Deduplicator (`shipper/`)
+* Ditulis dalam bahasa **Rust** menggunakan Axum dan Tokio.
 * Menerima alert dari OpenObserve.
 * Menghitung hash unik: `hash(app_name + error_file + error_line + error_type)`.
 * Menerapkan **cooldown 30 menit** (mencegah agent memproses insiden berulang saat puluhan user mendapati error yang sama).
-* Memperkaya payload dengan cuplikan kode dari GitHub API (20 baris sebelum dan sesudah baris error).
-* Mengirimkan payload JSON terstandar ke Aina / Webhook Agent.
+* Membaca registrasi modular dari `apps.d/*.yaml`.
+* Mengirimkan payload JSON terstandar ke Coding Agent Webhook endpoint.
 
 ---
 
-## 4. Keuntungan Pendekatan Agent-Agnostic bagi Ekosistem Aina
+## 4. Keuntungan Pendekatan Agent-Agnostic
 
-* **Aina Tetap Independen:** Aina tetap berada di ekosistem AGY mesh-nya, menjalankan perannya sebagai *senior coding companion*.
-* **Standarisasi Kontrak Data:** Aina hanya perlu memahami satu spesifikasi payload JSON (dijelaskan di [docs/CONTEXT_SPEC.md](CONTEXT_SPEC.md)).
-* **Plug & Play:** Jika Anda ingin menghubungkan notifikasi ini ke n8n, Slack, Discord, atau agent lain secara paralel, cukup tambahkan URL tujuan di konfigurasi `shipper/config.yaml`.
+* **Bebas Keterikatan Vendor:** Sistem observabilitas ini tidak terikat pada satu LLM atau agent runtime tertentu.
+* **Standarisasi Kontrak Data:** Setiap agent hanya perlu memahami satu spesifikasi payload JSON (dijelaskan di [docs/CONTEXT_SPEC.md](CONTEXT_SPEC.md)).
+* **Plug & Play:** Jika Anda ingin mengganti agen perbaikan kode dari runner lokal ke cloud worker (atau GitHub Actions), cukup ubah `AGENT_TARGET_URL` di konfigurasi environment.

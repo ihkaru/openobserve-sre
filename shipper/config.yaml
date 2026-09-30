@@ -10,7 +10,7 @@ deduplication:
   cooldown_seconds: 1800 # 30 minutes cooldown for identical error signatures
 
 agent_dispatch:
-  # Target agent webhook (Aina AGY Mesh runner or standard HTTP webhook)
+  # Target coding agent webhook (Autonomous Coding Agent / Webhook Runner)
   target_url: "http://localhost:8000/webhook/agent-remediation"
   auth_token: ""
 
