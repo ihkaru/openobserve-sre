@@ -10,55 +10,137 @@
 
 ---
 
-## ⚡ Quickstart (Up & Running in 2 Minutes)
+## ⚡ Getting Started (The Best-Practice 2-Tier Pattern)
 
-Get the complete SRE Hub running and tested locally or on your server in 3 simple steps:
+The recommended production architecture operates as an autonomous **2-Tier SRE Sensor**:
+* **Tier 2 (Deep In-App Context & SSOT - Primary):** Monitored applications use standard official Sentry SDKs with self-describing repository tags in their `.env`. When an error occurs, the exact HTTP request body, preceding SQL query breadcrumbs, and exact client GitHub repository URL are captured.
+* **Tier 1 (Outer Black-Box Safety Net):** Vector streams container stdout/stderr from Docker (`docker.sock`) and cPanel `error_log` to catch fatal server crashes, startup errors, and OOM kills (mitigating the *Dead-App Paradox*).
 
-### 1. Clone & Start the Stack
+---
+
+### Step 1: Start the SRE Hub (2 Minutes)
+
+Launch OpenObserve and the Rust Context Shipper locally or on your server:
+
 ```bash
 git clone https://github.com/ihkaru/openobserve-sre.git
 cd openobserve-sre
 docker compose up -d --build
 ```
-* Both **OpenObserve** (Port `5080`) and the **Rust Context Shipper** (Port `8089`) are now live.
-* Open your browser at `http://localhost:5080` (Default credentials from `docker-compose.yml`: Email `admin@yourdomain.com`, Password `ChangeThisPasswordSecure!`).
+* **OpenObserve Web UI:** `http://localhost:5080` (Default credentials: `admin@yourdomain.com` / `ChangeThisPasswordSecure!`)
+* **Rust Shipper API:** `http://localhost:8089` (Verify with `curl http://localhost:8089/healthz`)
 
-### 2. Verify Service Health
-```bash
-curl http://localhost:8089/healthz
-```
-*Expected response:*
-```json
-{"active_cached_incidents":0,"runtime":"rust","service":"openobserve-sre-shipper","status":"ok"}
+---
+
+### Step 2: Connect Your Monitored Applications (The 1-Line SSOT Pattern)
+
+In your production applications (PHP Laravel, Node.js, Python, Go), install the official standard Sentry SDK. To support **different GitHub accounts or client organizations**, declare the repository directly in the application's environment (**Single Source of Truth**):
+
+#### In Your Application `.env`:
+```env
+# 1. Point DSN to your SRE Shipper instance
+SENTRY_DSN=http://public@sre.yourdomain.com:8089/toko-online-api
+
+# 2. SSOT: Declare the exact GitHub account and test command (Zero Guessing!)
+SENTRY_TAGS_REPO_URL=https://github.com/client-xyz/toko-online-api
+SENTRY_TAGS_BRANCH=main
+SENTRY_TAGS_VERIFICATION_COMMAND=php artisan test
 ```
 
-### 3. Send a Mock Incident Alert (Smoke Test)
-Simulate an exception from a monitored container to see the Shipper parse the stack trace, enforce deduplication, and dispatch to your agent:
+#### Multi-Language Quick Setup (Zero Hub Maintenance):
+* **Laravel (PHP):**
+  ```bash
+  composer require sentry/sentry-laravel
+  ```
+* **Node.js (Express / NestJS):**
+  ```typescript
+  import * as Sentry from "@sentry/node";
+  Sentry.init({ dsn: process.env.SENTRY_DSN });
+  ```
+* **Python (FastAPI / Django):**
+  ```python
+  import sentry_sdk
+  sentry_sdk.init(dsn=os.getenv("SENTRY_DSN"))
+  ```
+
+---
+
+### Step 3: Configure Your Autonomous Coding Agent Webhook
+
+In `docker-compose.yml` (or via Coolify environment variables), set the webhook endpoint where your autonomous coding agent or CI runner receives tasks:
+
+```env
+AGENT_TARGET_URL=https://agent.yourdomain.com/webhook/remediation
+AGENT_AUTH_TOKEN=your_secure_bearer_token
+```
+
+---
+
+### Step 4: Verify End-to-End with a Smoke Test
+
+Simulate a production exception containing an HTTP request body, SQL breadcrumbs, and client repository metadata:
+
 ```bash
-curl -X POST http://localhost:8089/webhook/openobserve \
+curl -X POST http://localhost:8089/api/toko-online-api/store \
   -H "Content-Type: application/json" \
   -d '{
-    "stream_name": "coolify_apps",
-    "alert_name": "test_php_fatal",
-    "records": [
-      {
-        "app_name": "toko-online-api",
-        "message": "PHP Fatal error: Uncaught Error: Call to undefined method Order::calculate() in /var/www/html/app/Services/OrderService.php on line 84"
-      }
-    ]
+    "event_id": "smoke_test_001",
+    "platform": "php",
+    "environment": "production",
+    "tags": {
+      "app_name": "toko-online-api",
+      "repo_url": "https://github.com/client-xyz/toko-online-api",
+      "branch": "main",
+      "verification_command": "php artisan test --filter=OrderTest"
+    },
+    "exception": {
+      "values": [{
+        "type": "PaymentFailedException",
+        "value": "Card declined: insufficient funds",
+        "stacktrace": {
+          "frames": [{
+            "filename": "app/Services/PaymentService.php",
+            "lineno": 88,
+            "function": "charge",
+            "in_app": true,
+            "context_line": "        throw new PaymentFailedException($res->message);",
+            "pre_context": ["    public function charge($order) {"],
+            "post_context": ["    }"]
+          }]
+        }
+      }]
+    },
+    "request": {
+      "url": "https://toko-online.com/api/checkout",
+      "method": "POST",
+      "data": { "item_id": 42, "qty": 2, "payment_method": "credit_card" }
+    },
+    "breadcrumbs": {
+      "values": [
+        { "category": "query", "message": "SELECT * FROM orders WHERE id = 42" },
+        { "category": "http", "message": "POST https://api.stripe.com/v1/charges 402" }
+      ]
+    }
   }'
 ```
-*Expected response:*
-```json
-{"app_name":"toko-online-api","event_id":"evt_1727678900_a1b2c3","status":"dispatched"}
-```
+
+* **Expected response:**
+  ```json
+  {"id":"smoke_test_001"}
+  ```
+* **What Happens Instantly:**
+  1. The event is stored in OpenObserve stream `sentry_events` for log search, dashboards, and historical queries.
+  2. The Shipper compiles the rich problem payload containing the exact request body, SQL breadcrumbs, source lines, and repository `https://github.com/client-xyz/toko-online-api`.
+  3. The payload is dispatched to your Coding Agent in **< 10 milliseconds**.
+  4. The Coding Agent generates a reproduction unit test, implements the fix, and opens a Pull Request!
+
 > [!TIP]
-> **Circuit Breaker Test:** Execute the exact same `curl` command again. The Shipper will immediately return `{"status":"throttled_or_empty"}` — protecting your coding agent from repeating error storms and token burnout!
+> **Circuit Breaker Test:** Execute the exact same `curl` command again. The Shipper automatically suppresses the duplicate event for 30 minutes, preventing agent invocation storms and token burnout!
 
 ---
 
 ## 📑 Table of Contents
-- [⚡ Quickstart (Up & Running in 2 Minutes)](#-quickstart-up--running-in-2-minutes)
+- [⚡ Getting Started (The Best-Practice 2-Tier Pattern)](#-getting-started-the-best-practice-2-tier-pattern)
 - [Why This Project Exists (The Problem)](#-why-this-project-exists-the-problem)
 - [System Architecture (Event-Driven Flow)](#-system-architecture-event-driven-flow)
 - [Core Features](#-core-features)
@@ -93,31 +175,33 @@ This architecture maintains a strict separation of concerns between the **Sensor
 
 ```mermaid
 flowchart TD
-    subgraph Apps ["20+ Production Applications (Zero-Touch Ingestion)"]
-        CP[cPanel Shared / VPS<br/>PHP / Node.js / Python / error_log]
-        CL[Coolify Docker Containers<br/>stdout / stderr]
+    subgraph TargetApps ["20+ Production Applications (Multi-Account)"]
+        CP[cPanel / Coolify Containers<br/>stdout / stderr / Docker Sock<br/>(Tier 1: Non-Intrusive Safety Net)]
+        SentryApps[Standard Sentry SDKs in Apps<br/>SENTRY_TAGS_REPO_URL=...<br/>(Tier 2: Deep Context & SSOT)]
     end
 
     subgraph Hub ["openobserve-sre (The Sensor)"]
-        V[Vector Log Collectors] --> OO[(OpenObserve Engine)]
+        direction TB
+        V[Vector Collectors] --> OO[(OpenObserve Engine)]
         OO -->|SQL Stream Alert < 15s| RS[Rust Context Shipper<br/>(Axum + Tokio)]
-        RS -->|Zero-Config / apps.d/| REG[App Registry]
+        SentryApps -->|POST /api/:project_id/envelope| RS
+        RS -->|Forward JSON Events| OO
         RS -->|Deduplication Cache 30m| DEDUP{Duplicate?}
         DEDUP -->|Yes| DROP[Drop / Throttle]
-        DEDUP -->|No| PACK[Pack Standard Context JSON]
+        DEDUP -->|No| PACK[Pack Rich Context JSON]
     end
 
     subgraph Actor ["Agent-Agnostic Consumers (The Mechanic)"]
-        PACK -->|POST Standard JSON| AGENT[Autonomous Coding Agent<br/>(Webhook Receiver / Sandbox)]
+        PACK -->|POST Standard Rich JSON| AGENT[Autonomous Coding Agent<br/>(Webhook Receiver / Sandbox)]
     end
 
     subgraph Resolution ["Resolution & Deployment"]
-        AGENT -->|Create Hotfix Branch & PR| GH[GitHub / GitLab]
+        AGENT -->|Create Hotfix Branch & PR| GH[GitHub / GitLab Multi-Account Repos]
         AGENT -->|Interactive Notification| WA[Maintainer (WhatsApp / Telegram)]
         WA -->|Tap 'Approve'| DEP[Coolify Webhook / cPanel Git Hook]
     end
 
-    Apps --> V
+    CP --> V
 ```
 
 ---
