@@ -243,4 +243,77 @@ mod tests {
         let incident_throttled = orchestrator.process_sentry_event(parsed_event);
         assert!(incident_throttled.is_none());
     }
+
+    #[test]
+    fn test_ssot_multi_account_repo_resolution() {
+        use parsers::SentryParser;
+
+        let composite = Arc::new(CompositeLogParser::new(vec![Box::new(PhpLogParser)]));
+        let dedup = Arc::new(InMemoryDeduplicator::new());
+        let registry = Arc::new(YamlAppRegistry::new().load_from_path("non_existent.yaml"));
+        let dispatcher = Arc::new(WebhookDispatcher::new("".to_string(), None, 5));
+
+        let orchestrator = IncidentOrchestrator::new(
+            composite,
+            dedup,
+            registry,
+            dispatcher,
+            300,
+        );
+
+        // 1. Sentry Event from a completely different GitHub account (client-xyz)
+        let sentry_json = json!({
+            "event_id": "sentry_client_xyz_99",
+            "platform": "php",
+            "environment": "production",
+            "tags": {
+                "app_name": "custom-payroll",
+                "repo_url": "https://github.com/client-xyz/custom-payroll",
+                "branch": "develop",
+                "verification_command": "php artisan test --filter=PayrollTest"
+            },
+            "exception": {
+                "values": [{
+                    "type": "PayrollCalculationException",
+                    "value": "Negative tax deduction calculated",
+                    "stacktrace": {
+                        "frames": [{
+                            "filename": "app/Payroll.php",
+                            "lineno": 105,
+                            "function": "computeTax",
+                            "in_app": true
+                        }]
+                    }
+                }]
+            }
+        });
+
+        let parsed_sentry = SentryParser::parse_store(&sentry_json, "custom-payroll").unwrap();
+        let incident = orchestrator.process_sentry_event(parsed_sentry).expect("Incident should be processed");
+
+        // Verify the exact client GitHub account URL is retained as the SSOT!
+        assert_eq!(incident.app_metadata.repository.url, "https://github.com/client-xyz/custom-payroll");
+        assert_eq!(incident.app_metadata.repository.default_branch, "develop");
+        assert_eq!(incident.remediation_instructions.verification_command, "php artisan test --filter=PayrollTest");
+
+        // 2. OpenObserve Log Record with SSOT repo_url from Docker label / env
+        let log_alert = json!({
+            "stream_name": "coolify_apps",
+            "alert_name": "multi_account_test",
+            "records": [
+                {
+                    "app_name": "mobile-pos",
+                    "repo_url": "https://github.com/partner-agency/mobile-pos",
+                    "branch": "release/v2",
+                    "verification_command": "npm run test:e2e",
+                    "message": "PHP Fatal error: Uncaught Error in /app/Cart.php on line 77"
+                }
+            ]
+        });
+
+        let log_incident = orchestrator.process_alert(&log_alert).expect("Log incident should be processed");
+        assert_eq!(log_incident.app_metadata.repository.url, "https://github.com/partner-agency/mobile-pos");
+        assert_eq!(log_incident.app_metadata.repository.default_branch, "release/v2");
+        assert_eq!(log_incident.remediation_instructions.verification_command, "npm run test:e2e");
+    }
 }

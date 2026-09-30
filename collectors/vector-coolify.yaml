@@ -24,6 +24,21 @@ transforms:
       # Extract app name from container name (e.g. /my-app-xyz -> my-app)
       .app_name = replace(to_string!(.container_name), r'^/', "")
       
+      # Extract SSOT repository URL and branch from container labels if present
+      if exists(.label."sre.repo_url") {
+        .repo_url = .label."sre.repo_url"
+      } else if exists(.label."coolify.git.repository") {
+        .repo_url = .label."coolify.git.repository"
+      } else if exists(.label."repo_url") {
+        .repo_url = .label."repo_url"
+      }
+
+      if exists(.label."sre.branch") {
+        .branch = .label."sre.branch"
+      } else if exists(.label."branch") {
+        .branch = .label."branch"
+      }
+
       # Detect log level from message text
       if contains(to_string!(.message), "ERROR") || contains(to_string!(.message), "Fatal error") || contains(to_string!(.message), "Exception") {
         .level = "error"

@@ -196,19 +196,39 @@ SENTRY_DSN=http://public@sre.yourdomain.com:8089/toko-online-api
 3. The Shipper forwards the event to OpenObserve (`/api/default/sentry_events/_json`) for long-term storage and dashboard analytics.
 4. The Shipper instantly constructs the rich problem payload and dispatches it to your Autonomous Coding Agent in < 10ms!
 
+### 🔑 Multi-Account GitHub Support: Self-Describing Telemetry (SSOT)
+
+If your 20+ applications belong to **different GitHub accounts or client organizations**, you never have to worry about the agent guessing the wrong repository. Applications declare their own repository as the **Single Source of Truth (SSOT)**:
+
+* **Via Sentry SDK (Application Level):**
+  Add the `repo_url` tag in your application's `.env`:
+  ```env
+  SENTRY_TAGS_REPO_URL=https://github.com/client-a/toko-online-api
+  SENTRY_TAGS_BRANCH=main
+  SENTRY_TAGS_VERIFICATION_COMMAND=php artisan test
+  ```
+* **Via Coolify / Docker (Container Level):**
+  Coolify automatically attaches the `coolify.git.repository` label to your containers. Vector extracts this into OpenObserve, and the Shipper uses it automatically. You can also specify an explicit label or env variable:
+  ```yaml
+  labels:
+    - "sre.repo_url=https://github.com/partner-agency/pos-kasir"
+    - "sre.branch=release/v2"
+  ```
+
+When the error payload reaches the Shipper, it uses the self-describing `repo_url` directly, completely bypassing any default assumptions.
+
 ---
 
 ## ⚙️ Application Registry & Convention over Configuration
 
-The SRE Hub adopts a **Zero-Config Default** philosophy:
-* When an incoming exception from service `pos-kasir` is received without an explicit configuration file, the Hub dynamically derives:
-  - **Repository URL:** `https://github.com/<DEFAULT_GITHUB_ORG>/<app_name>` (organization configurable via `DEFAULT_GITHUB_ORG`, defaults to `ihkaru`).
-  - **Default Branch:** `main`.
-  - **Language & Test Command:** Inferred automatically from the parsed stack trace:
-    - PHP Fatal Errors / Exceptions → `php` (`php artisan test`)
-    - Python Exceptions → `python` (`pytest`)
-    - Go Runtime Panics → `go` (`go test ./...`)
-    - Node / TypeScript Exceptions → `nodejs` (`npm test`)
+The SRE Hub adopts a **Hierarchical Resolution** philosophy:
+1. **Self-Describing Tag (Highest Priority - SSOT):** Reads `repo_url` directly from the Sentry tag or Docker container label.
+2. **Modular File Registry (`apps.d/*.yaml`):** Overrides for non-standard repos or monorepos.
+3. **Convention Fallback:** Defaults to `https://github.com/<DEFAULT_GITHUB_ORG>/<app_name>` with test command inferred from the stack trace:
+   - PHP Fatal Errors / Exceptions → `php` (`php artisan test`)
+   - Python Exceptions → `pytest`
+   - Go Runtime Panics → `go test ./...`
+   - Node / TypeScript Exceptions → `npm test`
 
 ### Custom Application Overrides (`apps.d/`)
 For non-standard repositories (such as monorepos, specific release branches, or custom test runners), you can define an optional standalone YAML file in [`apps.d/`](apps.d/):

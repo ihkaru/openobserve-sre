@@ -112,7 +112,24 @@ impl IncidentOrchestrator {
             inferred_lang.to_string()
         };
 
-        let verification_command = if app_meta.verification_command != "npm test" || app_meta.framework != "unknown" {
+        let repo_url = first_record
+            .get("repo_url")
+            .or_else(|| first_record.get("repository"))
+            .or_else(|| first_record.get("git_repo"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or(app_meta.repo_url);
+
+        let default_branch = first_record
+            .get("branch")
+            .or_else(|| first_record.get("default_branch"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or(app_meta.default_branch);
+
+        let verification_command = if let Some(cmd) = first_record.get("verification_command").and_then(|v| v.as_str()) {
+            cmd.to_string()
+        } else if app_meta.verification_command != "npm test" || app_meta.framework != "unknown" {
             app_meta.verification_command
         } else {
             inferred_cmd.to_string()
@@ -138,8 +155,8 @@ impl IncidentOrchestrator {
                 framework: app_meta.framework,
                 repository: RepositoryInfo {
                     provider: "github".to_string(),
-                    url: app_meta.repo_url,
-                    default_branch: app_meta.default_branch,
+                    url: repo_url,
+                    default_branch,
                     target_branch: format!("hotfix/auto-heal-{}", event_id),
                 },
             },
@@ -220,8 +237,14 @@ impl IncidentOrchestrator {
             }
         };
 
-        // Determine verification command
-        let verification_command = if app_meta.verification_command != "npm test" || app_meta.framework != "unknown" {
+        // Determine verification command (SSOT tag override > registry > inferred)
+        let verification_command = if let Some(cmd) = sentry_event
+            .tags
+            .get("verification_command")
+            .or_else(|| sentry_event.tags.get("test_command"))
+        {
+            cmd.clone()
+        } else if app_meta.verification_command != "npm test" || app_meta.framework != "unknown" {
             app_meta.verification_command.clone()
         } else {
             match language.as_str() {
@@ -231,6 +254,23 @@ impl IncidentOrchestrator {
                 _ => "npm test".to_string(),
             }
         };
+
+        // Determine repository URL and branch (SSOT tag override > registry > default convention)
+        let repo_url = sentry_event
+            .tags
+            .get("repo_url")
+            .or_else(|| sentry_event.tags.get("repository"))
+            .or_else(|| sentry_event.tags.get("git_repo"))
+            .or_else(|| sentry_event.tags.get("repo"))
+            .cloned()
+            .unwrap_or(app_meta.repo_url);
+
+        let default_branch = sentry_event
+            .tags
+            .get("branch")
+            .or_else(|| sentry_event.tags.get("default_branch"))
+            .cloned()
+            .unwrap_or(app_meta.default_branch);
 
         // Surrounding logs from breadcrumbs (chronological SQL queries, outbound HTTP calls)
         let surrounding_logs: Vec<String> = if !sentry_event.breadcrumbs.is_empty() {
@@ -271,8 +311,8 @@ impl IncidentOrchestrator {
                 framework: app_meta.framework,
                 repository: RepositoryInfo {
                     provider: "github".to_string(),
-                    url: app_meta.repo_url,
-                    default_branch: app_meta.default_branch,
+                    url: repo_url,
+                    default_branch,
                     target_branch: format!("hotfix/auto-heal-{}", event_id),
                 },
             },
