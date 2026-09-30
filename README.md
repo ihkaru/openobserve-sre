@@ -2,51 +2,51 @@
 
 [![Rust](https://img.shields.io/badge/Language-Rust_1.98+-orange.svg?style=flat&logo=rust)](https://www.rust-lang.org/)
 [![OpenObserve](https://img.shields.io/badge/Engine-OpenObserve-blue.svg)](https://openobserve.ai/)
-[![Coolify Ready](https://img.shields.io/badge/Deploy-Coolify_Auto--Deploy-purple.svg)](#-deployment-di-coolify-via-github-app-auto-deploy)
+[![Coolify Ready](https://img.shields.io/badge/Deploy-Coolify_Auto--Deploy-purple.svg)](#-deployment-on-coolify-via-github-app-auto-deploy)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 > **Centralized Autonomous SRE Telemetry Gateway & Incident Shipper for Multi-App Stacks.**  
-> Bertindak sebagai **Sensor & Radar SRE terpusat** yang mengumpulkan log dari 20+ aplikasi di cPanel dan Coolify secara *zero-touch*, mendeteksi insiden produksi secara *real-time* (< 15 detik), mengemas konteks kejadian (*stack trace, breadcrumbs, git commit*), dan menembakkan *standard problem payload* ke **Autonomous Coding Agent** mana pun untuk memicu siklus perbaikan mandiri (*auto-healing loop*).
+> Functions as a **centralized SRE radar and telemetry sensor** that collects logs across 20+ production applications in cPanel and Coolify via zero-touch log ingestion, detects production incidents in real time (< 15 seconds), packages rich execution context (*stack traces, surrounding breadcrumb logs, git commit metadata*), and dispatches standardized problem payloads to any **Autonomous Coding Agent** to close the automated self-healing loop.
 
 ---
 
-## 📑 Daftar Isi
-- [Kenapa Proyek Ini Ada? (The Problem)](#-kenapa-proyek-ini-ada-the-problem)
-- [Arsitektur Sistem (Event-Driven Flow)](#-arsitektur-sistem-event-driven-flow)
-- [Fitur Utama](#-fitur-utama)
-- [🛡️ Mitigasi Ledakan Baris Kode: Modular `apps.d/`](#️-mitigasi-ledakan-baris-kode-modular-appsd)
-- [📡 Spesifikasi Webhook Kontrak Coding Agent](#-spesifikasi-webhook-kontrak-coding-agent)
-- [🤖 Cara Menyiapkan Environment Coding Agent](#-cara-menyiapkan-environment-coding-agent)
-- [🚀 Deployment di Coolify via GitHub App Auto-Deploy](#-deployment-di-coolify-via-github-app-auto-deploy)
-- [⚡ Quickstart Lokal (5 Menit)](#-quickstart-lokal-5-menit)
-- [📦 Menghubungkan Log 20+ Aplikasi (Zero-Touch)](#-menghubungkan-log-20-aplikasi-zero-touch)
-- [🧪 Testing & Verifikasi](#-testing--verifikasi)
-- [📚 Dokumentasi Lanjutan](#-dokumentasi-lanjutan)
+## 📑 Table of Contents
+- [Why This Project Exists (The Problem)](#-why-this-project-exists-the-problem)
+- [System Architecture (Event-Driven Flow)](#-system-architecture-event-driven-flow)
+- [Core Features](#-core-features)
+- [🛡️ Mitigating Configuration Explosion: Modular `apps.d/`](#️-mitigating-configuration-explosion-modular-appsd)
+- [📡 Coding Agent Webhook Contract Specification](#-coding-agent-webhook-contract-specification)
+- [🤖 Setting Up Your Coding Agent Environment](#-setting-up-your-coding-agent-environment)
+- [🚀 Deployment on Coolify via GitHub App Auto-Deploy](#-deployment-on-coolify-via-github-app-auto-deploy)
+- [⚡ Local Quickstart (5 Minutes)](#-local-quickstart-5-minutes)
+- [📦 Zero-Touch Log Collection (Coolify & cPanel)](#-zero-touch-log-collection-coolify--cpanel)
+- [🧪 Testing & Verification](#-testing--verification)
+- [📚 Documentation Reference](#-documentation-reference)
 
 ---
 
-## 🎯 Kenapa Proyek Ini Ada? (The Problem)
+## 🎯 Why This Project Exists (The Problem)
 
-Sebagai pengelola atau *one-person company* yang memegang 20+ aplikasi di *production*:
-* **Reaktif & Mengganggu Fokus:** Pengguna sering kali menemukan bug lebih dulu dan langsung komplain di chat/WhatsApp sebelum developer menyadarinya.
-* **Kelelahan Konteks (Context Fatigue):** Menelusuri log di puluhan server/container berbeda menghabiskan waktu berjam-jam saat terjadi insiden.
-* **Biaya Observabilitas Mahal:** Menjalankan Datadog atau NewRelic untuk puluhan aplikasi membakar anggaran; menjalankan ELK stack lokal memakan RAM puluhan GB.
+For solo developers and small engineering teams maintaining 20+ applications in production:
+* **Reactive & Stressful:** End users frequently encounter bugs before maintainers do, reporting outages via direct messages and support channels.
+* **Context Fatigue:** Manually tracing logs across dozens of disparate VPS servers, cPanel accounts, and Docker hosts consumes hours of firefighting time.
+* **Prohibitive Observability Costs:** Running Datadog or New Relic across 20+ services quickly becomes cost-prohibitive, while traditional self-hosted ELK stacks demand massive RAM resources.
 
-### 💡 Solusi: OpenObserve + Rust Shipper + Coding Agent
-1. **OpenObserve:** Engine observabilitas berbasis Rust yang sangat hemat memori (< 200 MB RAM) dan 140x lebih murah daripada Elasticsearch.
-2. **Rust Context Shipper (`shipper/`):** Microservice perantara berlatensi rendah (< 10ms) yang menduplikasi error, mengekstrak baris kode yang rusak, dan merakit paket masalah terstandar.
-3. **Autonomous Coding Agent (Agent-Agnostic):** Agen AI apa pun (Claude Code, OpenHands, runner lokal, atau custom script) menerima webhook terstandar, memperbaiki bug di branch terisolasi, menjalankan tes, dan membuka Pull Request.
+### 💡 The Solution: OpenObserve + Rust Shipper + Coding Agent
+1. **OpenObserve:** A Rust-based, petabyte-scale observability engine that requires under 200 MB of RAM and delivers up to 140x lower storage costs compared to Elasticsearch.
+2. **Rust Context Shipper (`shipper/`):** A sub-10ms microservice that deduplicates recurring errors, extracts failing source lines, and constructs standardized incident payloads.
+3. **Autonomous Coding Agent (Agent-Agnostic):** Any coding agent (Claude Code, OpenHands, custom runners, or CI pipelines) ingests the standardized webhook, reproduces the issue in an isolated branch, verifies fixes with test suites, and opens a GitHub Pull Request.
 
 ---
 
-## 📐 Arsitektur Sistem (Event-Driven Flow)
+## 📐 System Architecture (Event-Driven Flow)
 
-Sistem ini memisahkan secara tegas antara **Sensor** (repositori ini) dan **Aktor** (Coding Agent):
+This architecture maintains a strict separation of concerns between the **Sensor** (this repository) and the **Actor** (the external Coding Agent):
 
 ```mermaid
 flowchart TD
-    subgraph Apps ["20+ Production Apps (Zero-Touch Ingestion)"]
-        CP[cPanel Shared/VPS<br/>PHP / Node / Python / error_log]
+    subgraph Apps ["20+ Production Applications (Zero-Touch Ingestion)"]
+        CP[cPanel Shared / VPS<br/>PHP / Node.js / error_log]
         CL[Coolify Docker Containers<br/>stdout / stderr]
     end
 
@@ -54,9 +54,9 @@ flowchart TD
         V[Vector Log Collectors] --> OO[(OpenObserve Engine)]
         OO -->|SQL Stream Alert < 15s| RS[Rust Context Shipper<br/>(Axum + Tokio)]
         RS -->|apps.d/ Scan| REG[Modular App Registry]
-        RS -->|Deduplication Cache 30m| DEDUP{Duplikat?}
-        DEDUP -->|Ya| DROP[Drop / Throttle]
-        DEDUP -->|Tidak| PACK[Pack Standard Context JSON]
+        RS -->|Deduplication Cache 30m| DEDUP{Duplicate?}
+        DEDUP -->|Yes| DROP[Drop / Throttle]
+        DEDUP -->|No| PACK[Pack Standard Context JSON]
     end
 
     subgraph Actor ["Agent-Agnostic Consumers (The Mechanic)"]
@@ -65,8 +65,8 @@ flowchart TD
 
     subgraph Resolution ["Resolution & Deployment"]
         AGENT -->|Create Hotfix Branch & PR| GH[GitHub / GitLab]
-        AGENT -->|Interactive Message| WA[Solo Founder (WhatsApp / Telegram)]
-        WA -->|Tap 'Approve'| DEP[Coolify Webhook / cPanel Git Pull]
+        AGENT -->|Interactive Notification| WA[Maintainer (WhatsApp / Telegram)]
+        WA -->|Tap 'Approve'| DEP[Coolify Webhook / cPanel Git Hook]
     end
 
     Apps --> V
@@ -74,31 +74,31 @@ flowchart TD
 
 ---
 
-## ✨ Fitur Utama
+## ✨ Core Features
 
-* **⚡ Deteksi Real-Time (< 15 Detik):** Memanfaatkan SQL Stream Alerting OpenObserve untuk menangkap fatal error dan exception seketika.
-* **🛡️ Circuit Breaker & Deduplikasi Otomatis:** Mencegah lonjakan pemanggilan agen dan pemborosan kuota token LLM saat puluhan user mendapati error yang sama dalam kurun waktu 30 menit.
-* **🔌 100% Agent-Agnostic:** Mengirimkan kontrak JSON terstandar via webhook HTTP POST. Bebas dihubungkan ke coding agent mana pun tanpa terikat vendor.
-* **📦 Modular Registry (`apps.d/`):** Menambah aplikasi ke-21 hingga ke-100 cukup dengan membuat 1 file baru tanpa menyentuh file konfigurasi utama.
-* **🚀 Zero-Touch Deployment:** Mengalirkan log langsung dari Docker socket Coolify dan file `error_log` cPanel tanpa mengubah satu baris pun kode aplikasi.
+* **⚡ Real-Time Detection (< 15 Seconds):** Leverages OpenObserve SQL Stream Alerting to catch fatal errors and unhandled exceptions instantly.
+* **🛡️ Automatic Circuit Breaker & Deduplication:** Prevents agent invocation storms and token burnout when dozens of users encounter the same exception within a 30-minute window.
+* **🔌 100% Agent-Agnostic:** Emits a standardized JSON contract over HTTP POST. Compatible with any autonomous agent runner without vendor lock-in.
+* **📦 Modular Registry (`apps.d/`):** Scale from 20 to 100+ services by adding standalone files without modifying shared configurations.
+* **🚀 Zero-Touch Log Collection:** Stream logs directly from Coolify Docker sockets and cPanel `error_log` files without modifying target application source code.
 
 ---
 
-## 🛡️ Mitigasi Ledakan Baris Kode: Modular `apps.d/`
+## 🛡️ Mitigating Configuration Explosion: Modular `apps.d/`
 
-Jika 50–100 aplikasi didaftarkan dalam 1 file tunggal, file konfigurasi akan membengkak menjadi ribuan baris dan rawan *git merge conflict*. 
+Managing 50 to 100 services in a single monolithic `config.yaml` file creates merge conflicts and introduces a single point of failure where a YAML indentation error breaks monitoring for all applications.
 
-Repositori ini menerapkan arsitektur **"1 App = 1 File Mandiri"** di direktori [`apps.d/`](apps.d/):
+This repository enforces a modular **"1 App = 1 Standalone File"** pattern inside the [`apps.d/`](apps.d/) directory:
 
 ```text
 apps.d/
-├── toko-online-api.yaml      # Konfigurasi App 1
-├── pos-kasir.yaml            # Konfigurasi App 2
-├── billing-service.yaml      # Konfigurasi App 3
-└── ... (dapat menampung ratusan aplikasi)
+├── toko-online-api.yaml      # Configuration for Service 1
+├── pos-kasir.yaml            # Configuration for Service 2
+├── billing-service.yaml      # Configuration for Service 3
+└── ... (scales cleanly to hundreds of independent files)
 ```
 
-Contoh konfigurasi [`apps.d/toko-online-api.yaml`](apps.d/toko-online-api.yaml):
+Example configuration in [`apps.d/toko-online-api.yaml`](apps.d/toko-online-api.yaml):
 ```yaml
 app_name: toko-online-api
 environment: production
@@ -110,13 +110,13 @@ default_branch: main
 verification_command: php artisan test
 ```
 
-Engine Rust Shipper secara otomatis memindai (*glob scan*) seluruh file `.yaml` di `apps.d/` saat *startup*.
+The Rust Shipper engine automatically scans and loads all `.yaml` files in `apps.d/` upon startup.
 
 ---
 
-## 📡 Spesifikasi Webhook Kontrak Coding Agent
+## 📡 Coding Agent Webhook Contract Specification
 
-Rust Shipper mengirimkan HTTP `POST` ke `AGENT_TARGET_URL` dengan payload JSON yang kaya konteks:
+The Rust Shipper delivers an HTTP `POST` to `AGENT_TARGET_URL` with a context-rich JSON payload:
 
 ```json
 {
@@ -156,56 +156,57 @@ Rust Shipper mengirimkan HTTP `POST` ke `AGENT_TARGET_URL` dengan payload JSON y
 
 ---
 
-## 🤖 Cara Menyiapkan Environment Coding Agent
+## 🤖 Setting Up Your Coding Agent Environment
 
-Panduan teknis mendalam mengenai arsitektur sandbox, antrean tugas (*job queue*), keamanan eksekusi tes, dan integrasi WhatsApp/Telegram approval telah didokumentasikan secara terpisah di:
+Detailed technical specifications covering ephemeral workspace sandboxing, job queues, test execution security, and 1-tap messaging approval gates are documented in:
 
 👉 **[docs/AGENT_ENVIRONMENT_SETUP.md](docs/AGENT_ENVIRONMENT_SETUP.md)**
 
 ---
 
-## 🚀 Deployment di Coolify via GitHub App Auto-Deploy
+## 🚀 Deployment on Coolify via GitHub App Auto-Deploy
 
-Repositori ini telah dikonfigurasi agar **100% siap di-deploy di Coolify** dengan siklus *auto-deploy* saat Anda melakukan push ke branch `main`.
+This repository is configured for native deployment on Coolify using the official GitHub App integration with continuous delivery on pushes to `main`.
 
-### Langkah Setup di Coolify:
-1. **Push Repositori ini ke GitHub Anda:**
+### Coolify Setup Steps:
+1. **Push this repository to GitHub:**
    ```bash
    cd /home/server/projects/openobserve-sre
    git push origin main
    ```
-2. **Buat Resource di Coolify:**
-   * Buka dashboard Coolify → **+ New Resource** → **Docker Compose Application**.
-   * Pilih **GitHub App** → pilih repositori `ihkaru/openobserve-sre` dan branch `main`.
-3. **Environment Variables:**
-   * Salin variabel dari [`.env.example`](.env.example) ke tab **Environment Variables** di Coolify:
-     - `ZO_ROOT_USER_EMAIL`: Email admin OpenObserve Anda.
-     - `ZO_ROOT_USER_PASSWORD`: Password admin OpenObserve Anda.
-     - `AGENT_TARGET_URL`: Endpoint Webhook Coding Agent Anda.
-     - `AGENT_AUTH_TOKEN`: Token rahasia jika diperlukan.
+2. **Create New Resource in Coolify:**
+   * Navigate to your Coolify project dashboard → Click **+ New Resource**.
+   * Select **Docker Compose Application**.
+   * Choose your **GitHub App** integration → Select `ihkaru/openobserve-sre` with branch `main`.
+3. **Configure Environment Variables:**
+   * Copy variables from [`.env.example`](.env.example) into Coolify's **Environment Variables** tab:
+     - `ZO_ROOT_USER_EMAIL`: OpenObserve administrator email.
+     - `ZO_ROOT_USER_PASSWORD`: OpenObserve administrator password.
+     - `AGENT_TARGET_URL`: Webhook URL of your coding agent worker.
+     - `AGENT_AUTH_TOKEN`: Optional secret Bearer token.
 4. **Deploy:**
-   * Klik tombol **Deploy** di Coolify.
-   * Coolify akan otomatis menjalankan OpenObserve (volume persisten `openobserve_data`) dan mengompilasi image Rust Shipper secara multi-stage (~15MB).
-5. **Auto-Deploy Aktif:**
-   * Setiap kali Anda menambah file baru di `apps.d/` dan melakukan `git push`, Coolify otomatis me-redeploy stack secara *seamless*!
+   * Click **Deploy** in Coolify.
+   * Coolify provisions OpenObserve with persistent named storage (`openobserve_data`) and builds the lightweight Rust Shipper image (~15 MB).
+5. **Continuous Deployment Active:**
+   * Any future `git push` adding or modifying files in `apps.d/` triggers a seamless rolling update in Coolify with zero downtime!
 
 ---
 
-## ⚡ Quickstart Lokal (5 Menit)
+## ⚡ Local Quickstart (5 Minutes)
 
-Jika ingin menjalankan pengujian di mesin lokal:
+To run the full stack locally for testing:
 
 ```bash
 cd /home/server/projects/openobserve-sre
 
-# 1. Jalankan OpenObserve dan Shipper bersamaan
+# 1. Start OpenObserve and Rust Context Shipper
 docker compose up -d --build
 
-# 2. Verifikasi status kedua service
+# 2. Verify health status
 curl http://localhost:8089/healthz
 # Output: {"active_cached_incidents":0,"runtime":"rust","service":"openobserve-sre-shipper","status":"ok"}
 
-# 3. Uji Simulasi Insiden (Smoke Test)
+# 3. Simulate an Incident Alert (Smoke Test)
 curl -X POST http://localhost:8089/webhook/openobserve \
   -H "Content-Type: application/json" \
   -d '{
@@ -219,16 +220,16 @@ curl -X POST http://localhost:8089/webhook/openobserve \
     ]
   }'
 ```
-*Respons:* `{"app_name":"toko-online-api","event_id":"evt_...","status":"dispatched"}`.
+*Expected response:* `{"app_name":"toko-online-api","event_id":"evt_...","status":"dispatched"}`.
 
 ---
 
-## 📦 Menghubungkan Log 20+ Aplikasi (Zero-Touch)
+## 📦 Zero-Touch Log Collection (Coolify & cPanel)
 
-Anda **TIDAK PERLU mengubah kode aplikasi** apa pun (*Zero-Touch*).
+You do **NOT** need to install SDKs or modify target application code.
 
-### A. Aplikasi di Coolify (Docker)
-Jalankan Vector container di host Coolify menggunakan konfigurasi [`collectors/vector-coolify.yaml`](collectors/vector-coolify.yaml):
+### A. Applications on Coolify (Docker Containers)
+Run a Vector container on your Coolify host using [`collectors/vector-coolify.yaml`](collectors/vector-coolify.yaml):
 ```bash
 docker run -d \
   --name vector-coolify \
@@ -238,37 +239,37 @@ docker run -d \
   timberio/vector:latest-alpine --config /etc/vector/vector.yaml
 ```
 
-### B. Aplikasi di cPanel (PHP / Shared)
-Jalankan binary Vector standalone di akun cPanel menggunakan konfigurasi [`collectors/vector-cpanel.yaml`](collectors/vector-cpanel.yaml):
+### B. Applications on cPanel (Shared / VPS)
+Run a standalone Vector binary under your cPanel account using [`collectors/vector-cpanel.yaml`](collectors/vector-cpanel.yaml):
 ```bash
 vector --config collectors/vector-cpanel.yaml &
 ```
 
 ---
 
-## 🧪 Testing & Verifikasi
+## 🧪 Testing & Verification
 
-Seluruh logika parsing, caching, dan pipeline telah dilengkapi unit test bawaan di Rust:
+The Rust Shipper includes a comprehensive test suite:
 
 ```bash
 cd /home/server/projects/openobserve-sre/shipper
 cargo test
 ```
 
-Hasil pengujian memverifikasi:
+Test coverage verifies:
 * ✅ PHP Fatal Error extractor (`file_path`, `line_number`).
-* ✅ Node.js/TypeScript stacktrace extractor.
+* ✅ Node.js / TypeScript stacktrace extractor.
 * ✅ Python traceback extractor.
 * ✅ Go runtime panic extractor (`main.go:line`).
-* ✅ Composite parser fallback.
-* ✅ In-memory circuit breaker deduplication & cooldown TTL.
-* ✅ End-to-end Orchestrator pipeline.
+* ✅ Composite parser delegation and fallback.
+* ✅ In-memory circuit breaker deduplication and cooldown expiration.
+* ✅ End-to-end Orchestrator processing.
 
 ---
 
-## 📚 Dokumentasi Lanjutan
-* **[docs/AGENT_ENVIRONMENT_SETUP.md](docs/AGENT_ENVIRONMENT_SETUP.md):** Panduan setup *runtime sandbox*, antrean, dan alur eksekusi coding agent.
-* **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md):** Analisis arsitektur sistem, *2-Tier Observability*, dan mitigasi *The Dead App Paradox*.
-* **[docs/CONTEXT_SPEC.md](docs/CONTEXT_SPEC.md):** Spesifikasi lengkap format JSON payload insiden.
-* **[docs/ROADMAP.md](docs/ROADMAP.md):** Checklist tahapan implementasi dari Day 1 s/d Auto-Deploy.
-* **[docs/sample-payload.json](docs/sample-payload.json):** Contoh konkret JSON konteks insiden siap pakai.
+## 📚 Documentation Reference
+* **[docs/AGENT_ENVIRONMENT_SETUP.md](docs/AGENT_ENVIRONMENT_SETUP.md):** Best practices for agent runtime sandboxing, job queues, and approval gates.
+* **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md):** System architecture, 2-Tier observability, and avoiding the Dead App Paradox.
+* **[docs/CONTEXT_SPEC.md](docs/CONTEXT_SPEC.md):** Detailed JSON schema specification for incident payloads.
+* **[docs/ROADMAP.md](docs/ROADMAP.md):** Implementation roadmap and milestone checklist.
+* **[docs/sample-payload.json](docs/sample-payload.json):** Standalone sample JSON payload for local agent testing.
