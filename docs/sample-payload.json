@@ -22,6 +22,45 @@
       "at CurrencyConverter.convert (src/services/currency.ts:42:18)",
       "at InvoiceService.calculate (src/services/invoice.ts:110:24)",
       "at processTicksAndRejections (node:internal/process/task_queues:95:5)"
+    ],
+    "source_context": {
+      "pre_context": [
+        "  async convert(amount: number, from: string, to: string) {",
+        "    const rates = await this.cache.getRates(from);"
+      ],
+      "context_line": "    return amount * rates[to].rate;",
+      "post_context": [
+        "  }"
+      ]
+    },
+    "local_variables": {
+      "amount": 250,
+      "from": "USD",
+      "to": "IDR",
+      "rates": {}
+    }
+  },
+  "diagnostics": {
+    "http_request": {
+      "url": "https://api.domain.com/v1/invoices/generate",
+      "method": "POST",
+      "body": {
+        "invoice_id": "INV-2026-001",
+        "amount": 250,
+        "currency": "USD"
+      }
+    },
+    "breadcrumbs": [
+      {
+        "category": "query",
+        "level": "info",
+        "message": "SELECT * FROM exchange_rates WHERE base = 'USD' LIMIT 1"
+      },
+      {
+        "category": "http",
+        "level": "warning",
+        "message": "GET https://api.exchangerate.host/latest 504"
+      }
     ]
   },
   "telemetry_context": {

@@ -1,4 +1,6 @@
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParsedError {
@@ -53,6 +55,16 @@ pub struct EnrichedAppMetadata {
     pub repository: RepositoryInfo,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SourceContext {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pre_context: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_line: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub post_context: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IncidentDetails {
     pub error_type: String,
@@ -60,6 +72,10 @@ pub struct IncidentDetails {
     pub file_path: String,
     pub line_number: u32,
     pub stack_trace: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_context: Option<SourceContext>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_variables: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,6 +91,44 @@ pub struct RemediationInstructions {
     pub verification_command: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HttpRequestContext {
+    pub url: String,
+    pub method: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query_string: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<Value>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub headers: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct BreadcrumbItem {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data: Option<Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RichDiagnostics {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub http_request: Option<HttpRequestContext>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub breadcrumbs: Vec<BreadcrumbItem>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user: Option<Value>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub tags: HashMap<String, String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IncidentContext {
     pub event_id: String,
@@ -83,4 +137,6 @@ pub struct IncidentContext {
     pub incident: IncidentDetails,
     pub telemetry_context: TelemetryContext,
     pub remediation_instructions: RemediationInstructions,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diagnostics: Option<RichDiagnostics>,
 }

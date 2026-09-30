@@ -63,6 +63,7 @@ curl -X POST http://localhost:8089/webhook/openobserve \
 - [System Architecture (Event-Driven Flow)](#-system-architecture-event-driven-flow)
 - [Core Features](#-core-features)
 - [📦 Zero-Touch Log Collection (Coolify & cPanel)](#-zero-touch-log-collection-coolify--cpanel)
+- [🩺 Deep In-App Error Context (Standard Sentry SDKs)](#-deep-in-app-error-context-standard-sentry-sdks)
 - [⚙️ Application Registry & Convention over Configuration](#️-application-registry--convention-over-configuration)
 - [📡 Coding Agent Webhook Contract Specification](#-coding-agent-webhook-contract-specification)
 - [🤖 Setting Up Your Coding Agent Environment](#-setting-up-your-coding-agent-environment)
@@ -151,6 +152,49 @@ Run a standalone Vector binary under your cPanel account using [`collectors/vect
 ```bash
 vector --config collectors/vector-cpanel.yaml &
 ```
+
+---
+
+## 🩺 Deep In-App Error Context (Standard Sentry SDKs)
+
+While outer log scraping (via Vector) provides an essential safety net for server crashes, integrating **official standard Sentry SDKs** in your critical services equips the coding agent with the **ultimate reproduction context**:
+* **HTTP Request Body:** The exact JSON/Form POST payload sent by the user when the error occurred (sensitive passwords & bearer tokens automatically scrubbed).
+* **Breadcrumbs:** Chronological trail of the last 5–10 database SQL queries and outbound HTTP calls leading up to the failure.
+* **Source Context:** 5 lines of source code before and after the crashing line.
+* **Local Variables:** Exact runtime variable values in the crashing stack frame.
+
+### 1-Line Setup in Target Applications
+You do **not** need a heavy self-hosted Sentry server (which requires 16+ GB RAM). The Rust Shipper includes a high-performance, native Sentry Ingest Gateway.
+
+Point the standard Sentry SDK in your application to the Shipper instance:
+
+```env
+# In your Laravel, Express, FastAPI, or Go .env file:
+SENTRY_DSN=http://public@sre.yourdomain.com:8089/toko-online-api
+```
+
+#### Multi-Language Integration Examples:
+* **Laravel (PHP):**
+  ```bash
+  composer require sentry/sentry-laravel
+  # Set SENTRY_LARAVEL_DSN=http://public@sre.yourdomain.com:8089/toko-online-api in .env
+  ```
+* **Express / NestJS (Node.js):**
+  ```typescript
+  import * as Sentry from "@sentry/node";
+  Sentry.init({ dsn: "http://public@sre.yourdomain.com:8089/pos-kasir" });
+  ```
+* **FastAPI / Django (Python):**
+  ```python
+  import sentry_sdk
+  sentry_sdk.init(dsn="http://public@sre.yourdomain.com:8089/billing-service")
+  ```
+
+#### How It Works Under the Hood:
+1. When an exception occurs, the Sentry SDK transmits the envelope to `POST /api/:project_id/envelope`.
+2. The Rust Shipper extracts the request body, SQL breadcrumbs, stack frames, and source lines.
+3. The Shipper forwards the event to OpenObserve (`/api/default/sentry_events/_json`) for long-term storage and dashboard analytics.
+4. The Shipper instantly constructs the rich problem payload and dispatches it to your Autonomous Coding Agent in < 10ms!
 
 ---
 

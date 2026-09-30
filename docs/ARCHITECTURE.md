@@ -22,22 +22,24 @@ In this architecture:
 
 ```mermaid
 flowchart TD
-    subgraph TargetApps ["20+ Production Applications (Zero-Touch)"]
-        CP[cPanel Shared / VPS<br/>PHP / Node.js / Python / error_log]
-        CL[Coolify Docker Containers<br/>stdout / stderr / Docker Sock]
+    subgraph TargetApps ["20+ Production Applications"]
+        CP[cPanel / Coolify stdout & stderr<br/>(Tier 1: Non-Intrusive Safety Net)]
+        SentryApps[Standard Sentry SDKs<br/>PHP / Node / Python / Go<br/>(Tier 2: Deep Context, Request Body, SQL)]
     end
 
     subgraph Hub ["openobserve-sre (Observability & Context Gateway)"]
         direction TB
         V[Vector Collectors] --> O2[(OpenObserve Engine)]
-        O2 --> SQL[SQL Alert Engine<br/>Detect 500 / Fatal in < 15s]
+        O2 --> SQL[SQL Alert Engine<br/>Detect 500 / Fatal]
         SQL --> Shipper[Rust Context Shipper<br/>(Axum + Tokio)]
+        SentryApps -->|POST /api/:project_id/envelope| Shipper
+        Shipper -->|Forward Sentry Events| O2
         Shipper --> AppReg[apps.d/ Modular Registry]
     end
 
     subgraph Consumers ["Agent-Agnostic Consumers"]
         direction TB
-        Shipper -->|Standard JSON Payload| AGENT[Autonomous Coding Agent<br/>(Webhook Receiver / Sandbox)]
+        Shipper -->|Standard Rich JSON Payload| AGENT[Autonomous Coding Agent<br/>(Webhook Receiver / Sandbox)]
         Shipper -.->|Plug & Play| OTHERS[Claude Code / OpenHands / Cursor / CI]
     end
 
@@ -47,7 +49,7 @@ flowchart TD
         WA -->|Tap 'Approve'| DEP[Coolify API Webhook / cPanel Git Hook]
     end
 
-    TargetApps --> V
+    CP --> V
 ```
 
 ---

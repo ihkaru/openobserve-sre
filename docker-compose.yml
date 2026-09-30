@@ -38,6 +38,8 @@ services:
       - AGENT_TARGET_URL=${AGENT_TARGET_URL:-http://localhost:8000/webhook/agent-remediation}
       - AGENT_AUTH_TOKEN=${AGENT_AUTH_TOKEN:-}
       - DEFAULT_GITHUB_ORG=${DEFAULT_GITHUB_ORG:-ihkaru}
+      - OPENOBSERVE_INGEST_URL=${OPENOBSERVE_INGEST_URL:-http://openobserve:5080/api/default/sentry_events/_json}
+      - OPENOBSERVE_AUTH_TOKEN=${OPENOBSERVE_AUTH_TOKEN:-YWRtaW5AZHZscGlkLm15LmlkOkNoYW5nZVRoaXNQYXNzd29yZEFkbWluMjAyNiE=}
     ports:
       - "${SHIPPER_PORT:-8089}:8089"
     volumes:

@@ -30,52 +30,77 @@ Delivering high-signal, zero-noise telemetry context ensures autonomous agents c
     }
   },
   "incident": {
-    "severity": "CRITICAL",
-    "error_type": "ErrorException",
-    "error_message": "Undefined array key \"customer_tax_id\"",
-    "file_path": "app/Services/CheckoutService.php",
-    "line_number": 84,
+    "error_type": "PaymentFailedException",
+    "error_message": "Card was declined by issuing bank",
+    "file_path": "app/Services/PaymentService.php",
+    "line_number": 88,
     "stack_trace": [
-      "app/Services/CheckoutService.php:84 in App\\Services\\CheckoutService::calculateTotal",
-      "app/Http/Controllers/OrderController.php:32 in App\\Http\\Controllers\\OrderController::checkout",
-      "vendor/laravel/framework/src/Illuminate/Routing/Controller.php:54 in call_user_func_array"
-    ]
-  },
-  "telemetry_context": {
-    "openobserve_stream": "coolify-apps",
-    "trigger_alert_name": "production_php_fatal_errors",
-    "surrounding_logs": [
-      "[2026-09-30 06:30:14] INFO: Checkout initiated for user_id=402, cart_id=1089",
-      "[2026-09-30 06:30:14] INFO: Applying discount coupon: FLASH2026",
-      "[2026-09-30 06:30:15] ERROR: Undefined array key \"customer_tax_id\" at /var/www/html/app/Services/CheckoutService.php:84"
+      "at processPayment (app/Services/PaymentService.php:88)",
+      "at checkout (app/Http/Controllers/OrderController.php:32)"
     ],
-    "sample_http_request": {
+    "source_context": {
+      "pre_context": [
+        "    public function processPayment($order) {",
+        "        $gateway = new Gateway();"
+      ],
+      "context_line": "        throw new PaymentFailedException($res->message);",
+      "post_context": [
+        "    }",
+        "}"
+      ]
+    },
+    "local_variables": {
+      "$order_id": 9921,
+      "$amount": 150000
+    }
+  },
+  "diagnostics": {
+    "http_request": {
+      "url": "https://api.domain.com/v1/checkout",
       "method": "POST",
-      "path": "/api/v1/checkout",
-      "status_code": 500,
-      "user_agent": "Mozilla/5.0 ... Mobile Safari",
-      "payload_sanitized": {
+      "query_string": "source=promo",
+      "body": {
         "cart_id": 1089,
         "coupon_code": "FLASH2026",
         "payment_method": "qris"
+      },
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "Mozilla/5.0 ... Mobile Safari"
       }
+    },
+    "breadcrumbs": [
+      {
+        "category": "query",
+        "level": "info",
+        "message": "SELECT * FROM wallets WHERE user_id = 42"
+      },
+      {
+        "category": "http",
+        "level": "warning",
+        "message": "POST https://api.payment.com/v1/charges 402"
+      }
+    ],
+    "user": {
+      "id": "user_42",
+      "email": "customer@example.com"
+    },
+    "tags": {
+      "environment": "production",
+      "app_name": "toko-online-api"
     }
   },
-  "code_context": {
-    "target_file_snippet": {
-      "start_line": 74,
-      "end_line": 94,
-      "content": "74:     public function calculateTotal(array $cart, array $customerData): float\n75:     {\n76:         $subtotal = $this->calculateSubtotal($cart);\n77:         $discount = $this->discountCalculator->apply($subtotal, $cart['coupon'] ?? null);\n78: \n79:         // Apply tax\n80:         $tax = 0.0;\n81:         if (config('tax.enabled')) {\n82:             // BUG: User registered without tax ID causes undefined array key\n83:             $tax = $this->taxEngine->compute(\n84:                 $subtotal - $discount,\n85:                 $customerData['customer_tax_id']\n86:             );\n87:         }\n88: \n89:         return $subtotal - $discount + $tax;\n90:     }"
-    }
+  "telemetry_context": {
+    "openobserve_stream": "sentry_events",
+    "trigger_alert_name": "sentry_sdk",
+    "surrounding_logs": [
+      "[breadcrumb:query] SELECT * FROM wallets WHERE user_id = 42",
+      "[breadcrumb:http] POST https://api.payment.com/v1/charges 402"
+    ]
   },
   "remediation_instructions": {
-    "objective": "Fix the undefined array key while preserving existing tax computation logic.",
-    "acceptance_criteria": [
-      "Null-safe access: handle cases where customer_tax_id is missing or null.",
-      "Add or update unit test in tests/Unit/CheckoutServiceTest.php.",
-      "Ensure all test suites pass."
-    ],
-    "verification_command": "php artisan test --filter=CheckoutServiceTest"
+    "objective": "Resolve PaymentFailedException in app/Services/PaymentService.php:88",
+    "verification_command": "php artisan test"
   }
 }
 ```
@@ -86,8 +111,10 @@ Delivering high-signal, zero-noise telemetry context ensures autonomous agents c
 
 | Field | Source | Purpose for the Agent |
 | :--- | :--- | :--- |
-| `incident.file_path` & `line_number` | OpenObserve Regex / OTel Exception | Directs the agent immediately to the affected code block without repo exploration overhead. |
-| `telemetry_context.surrounding_logs` | OpenObserve `{rows:N}` | Provides sequence breadcrumbs immediately preceding the failure. |
-| `code_context.target_file_snippet` | GitHub API via Shipper | Delivers local code visibility even before git clone finishes. |
-| `remediation_instructions.verification_command` | Mapped in `apps.d/*.yaml` | Instructs the agent which test runner to invoke to verify its fix (`npm test`, `pytest`, `go test`, `php artisan test`). |
+| `incident.file_path` & `line_number` | Sentry Frame / OpenObserve Parser | Directs the agent immediately to the affected code block without repo exploration overhead. |
+| `incident.source_context` | Sentry Frame Context | Delivers lines of code immediately surrounding the crash before git operations. |
+| `incident.local_variables` | Sentry Stack Variables | Shows exact runtime variable values at the point of failure. |
+| `diagnostics.http_request.body` | Sentry Request Payload | **Goldmine for reproduction**: allows agent to generate an exact deterministic reproduction unit test in seconds. |
+| `diagnostics.breadcrumbs` | Sentry Breadcrumbs | Shows the chronological sequence of SQL queries and external HTTP requests before the crash. |
+| `remediation_instructions.verification_command` | Mapped in `apps.d/*.yaml` / Inferred | Instructs the agent which test runner to invoke to verify its fix (`npm test`, `pytest`, `go test`, `php artisan test`). |
 | `app_metadata.repository.target_branch` | Generated by Shipper | Guarantees that agent work is isolated to an ephemeral hotfix branch. |
