@@ -17,12 +17,6 @@ services:
       - openobserve_data:/data
     networks:
       - sre_net
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5080/healthz"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
 
   context-shipper:
     build:
@@ -48,8 +42,7 @@ services:
     networks:
       - sre_net
     depends_on:
-      openobserve:
-        condition: service_healthy
+      - openobserve
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8089/healthz || exit 1"]
       interval: 15s
