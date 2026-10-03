@@ -15,8 +15,6 @@ services:
       - "${OPENOBSERVE_PORT:-5080}:5080"
     volumes:
       - openobserve_data:/data
-    networks:
-      - sre_net
 
   context-shipper:
     build:
@@ -36,8 +34,6 @@ services:
       - OPENOBSERVE_AUTH_TOKEN=${OPENOBSERVE_AUTH_TOKEN:-YWRtaW5AZHZscGlkLm15LmlkOkNoYW5nZVRoaXNQYXNzd29yZEFkbWluMjAyNiE=}
     ports:
       - "${SHIPPER_PORT:-8089}:8089"
-    networks:
-      - sre_net
     depends_on:
       - openobserve
     healthcheck:
@@ -50,7 +46,3 @@ services:
 volumes:
   openobserve_data:
     driver: local
-
-networks:
-  sre_net:
-    driver: bridge
