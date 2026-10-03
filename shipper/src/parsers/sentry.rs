@@ -151,10 +151,10 @@ impl SentryParser {
         // Determine app_name
         let app_name = if let Some(name) = tags.get("app_name").or_else(|| tags.get("app")) {
             name.clone()
-        } else if let Some(server_name) = event.get("server_name").and_then(|v| v.as_str()) {
-            server_name.to_string()
         } else if !project_id.is_empty() && project_id != "1" && !project_id.chars().all(|c| c.is_ascii_digit()) {
             project_id.to_string()
+        } else if let Some(server_name) = event.get("server_name").and_then(|v| v.as_str()) {
+            server_name.to_string()
         } else if let Some(release) = event.get("release").and_then(|v| v.as_str()) {
             release.split('@').next().unwrap_or(project_id).to_string()
         } else if !project_id.is_empty() {
