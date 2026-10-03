@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::io::Read;
+use flate2::read::GzDecoder;
 use serde_json::Value;
 use tracing::warn;
 use crate::models::{
@@ -33,7 +35,20 @@ impl SentryParser {
     /// - Line 1: Envelope Header JSON
     /// - Repeated Items: Item Header JSON, followed by payload (bytes/JSON)
     pub fn parse_envelope(raw_bytes: &[u8], project_id: &str) -> Result<ParsedSentryEvent, String> {
-        let text = String::from_utf8_lossy(raw_bytes);
+        let decompressed: Vec<u8>;
+        let payload_bytes = if raw_bytes.starts_with(&[0x1f, 0x8b]) {
+            let mut decoder = GzDecoder::new(raw_bytes);
+            let mut buf = Vec::new();
+            if let Err(e) = decoder.read_to_end(&mut buf) {
+                return Err(format!("Failed to decompress gzip Sentry envelope: {}", e));
+            }
+            decompressed = buf;
+            &decompressed[..]
+        } else {
+            raw_bytes
+        };
+
+        let text = String::from_utf8_lossy(payload_bytes);
         let mut lines = text.lines();
 
         let header_line = lines.next().ok_or_else(|| "Empty envelope body".to_string())?;
