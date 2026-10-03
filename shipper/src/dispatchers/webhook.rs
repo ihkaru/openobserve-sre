@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use reqwest::Client;
+use serde_json::json;
 use std::time::Duration;
 use tracing::{error, info, warn};
 use crate::models::IncidentContext;
@@ -41,11 +42,58 @@ impl Dispatcher for WebhookDispatcher {
             "Dispatching incident payload to agent webhook"
         );
 
-        let mut request = self.client.post(&self.target_url).json(payload);
+        let title = format!(
+            "{}: {} ({}:{})",
+            payload.incident.error_type,
+            payload.incident.error_message,
+            payload.incident.file_path,
+            payload.incident.line_number
+        );
+
+        let mut details = format!(
+            "App: {}\nError: {}\nFile: {}:{}\nVerification Command: {}\nTarget Branch: {}",
+            payload.app_metadata.app_name,
+            payload.incident.error_message,
+            payload.incident.file_path,
+            payload.incident.line_number,
+            payload.remediation_instructions.verification_command,
+            payload.app_metadata.repository.target_branch
+        );
+
+        if !payload.incident.stack_trace.is_empty() {
+            details.push_str("\n\nStacktrace:\n");
+            for frame in payload.incident.stack_trace.iter().take(6) {
+                details.push_str(&format!("  {}\n", frame));
+            }
+        }
+
+        if let Some(diag) = &payload.diagnostics {
+            if let Some(req) = &diag.http_request {
+                details.push_str(&format!("\nHTTP Request: {} {}\n", req.method, req.url));
+                if let Some(body) = &req.body {
+                    details.push_str(&format!("Request Body: {}\n", body));
+                }
+            }
+        }
+
+        let aina_payload = json!({
+            "source": "openobserve-sre",
+            "severity": "critical",
+            "service": payload.app_metadata.app_name,
+            "title": title,
+            "details": details,
+            "repository": payload.app_metadata.repository.url,
+            "event_id": payload.event_id,
+            "incident_context": payload
+        });
+
+        let mut request = self.client.post(&self.target_url).json(&aina_payload);
 
         if let Some(token) = &self.auth_token {
             if !token.is_empty() {
-                request = request.header("Authorization", format!("Bearer {}", token));
+                request = request
+                    .header("Authorization", format!("Bearer {}", token))
+                    .header("X-API-Key", token);
             }
         }
 
