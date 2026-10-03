@@ -65,6 +65,21 @@ SENTRY_TAGS_VERIFICATION_COMMAND=php artisan test
 
 ---
 
+### 🤖 Official AI Agent Skill & Runbook (`SKILL.md`)
+
+This repository ships with an official **Antigravity / Autonomous Coding Agent Skill** located at [`skills/sre-app-onboarding/SKILL.md`](skills/sre-app-onboarding/SKILL.md). Any AI coding assistant working on your client services can load this skill to automatically instrument Sentry, set self-describing telemetry tags, and verify incident dispatch:
+
+* **Skill Name:** `sre-app-onboarding`
+* **Runbook:** [`skills/sre-app-onboarding/SKILL.md`](skills/sre-app-onboarding/SKILL.md)
+* **Multi-Language Examples:**
+  - Laravel / PHP: [`skills/sre-app-onboarding/examples/laravel.php`](skills/sre-app-onboarding/examples/laravel.php)
+  - Node.js / Express / TypeScript: [`skills/sre-app-onboarding/examples/express.ts`](skills/sre-app-onboarding/examples/express.ts)
+  - Python / FastAPI: [`skills/sre-app-onboarding/examples/fastapi.py`](skills/sre-app-onboarding/examples/fastapi.py)
+  - Go: [`skills/sre-app-onboarding/examples/golang.go`](skills/sre-app-onboarding/examples/golang.go)
+* **Telemetry Specification:** [`skills/sre-app-onboarding/references/telemetry-schema.md`](skills/sre-app-onboarding/references/telemetry-schema.md)
+
+---
+
 ### Step 3: Configure Your Autonomous Coding Agent Webhook
 
 In `docker-compose.yml` (or via Coolify environment variables), set the webhook endpoint where your autonomous coding agent or CI runner receives tasks:
