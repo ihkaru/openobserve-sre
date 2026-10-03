@@ -4,7 +4,7 @@ services:
     container_name: openobserve-sre
     restart: unless-stopped
     environment:
-      - ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL:-admin@yourdomain.com}
+      - ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL:-admin@example.com}
       - ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD:-ChangeThisPasswordSecure!}
       - ZO_DATA_DIR=/data
       - ZO_HTTP_PORT=5080
@@ -29,9 +29,9 @@ services:
       - RUST_LOG=info
       - AGENT_TARGET_URL=${AGENT_TARGET_URL:-http://localhost:8000/webhook/agent-remediation}
       - AGENT_AUTH_TOKEN=${AGENT_AUTH_TOKEN:-}
-      - DEFAULT_GITHUB_ORG=${DEFAULT_GITHUB_ORG:-ihkaru}
+      - DEFAULT_GITHUB_ORG=${DEFAULT_GITHUB_ORG:-your-org}
       - OPENOBSERVE_INGEST_URL=${OPENOBSERVE_INGEST_URL:-http://openobserve:5080/api/default/sentry_events/_json}
-      - OPENOBSERVE_AUTH_TOKEN=${OPENOBSERVE_AUTH_TOKEN:-YWRtaW5AZHZscGlkLm15LmlkOkNoYW5nZVRoaXNQYXNzd29yZEFkbWluMjAyNiE=}
+      - OPENOBSERVE_AUTH_TOKEN=${OPENOBSERVE_AUTH_TOKEN:-YWRtaW5AZXhhbXBsZS5jb206Q2hhbmdlVGhpc1Bhc3N3b3JkU2VjdXJlIQ==}
     ports:
       - "${SHIPPER_PORT:-8089}:8089"
     depends_on:

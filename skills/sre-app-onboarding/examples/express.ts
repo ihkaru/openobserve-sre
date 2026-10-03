@@ -18,7 +18,7 @@ Sentry.init({
   initialScope: {
     tags: {
       app_name: process.env.APP_NAME_SLUG || "my-express-app",
-      repository: process.env.GITHUB_REPOSITORY || "https://github.com/ihkaru/my-express-app",
+      repository: process.env.GITHUB_REPOSITORY || "https://github.com/your-org/my-express-app",
       verification_command: process.env.SRE_VERIFY_CMD || "npm test",
       branch: process.env.GIT_BRANCH || "main",
     },

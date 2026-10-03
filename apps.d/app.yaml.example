@@ -4,7 +4,7 @@
 # NOTE: You do NOT need this file for standard services!
 # The SRE Gateway automatically resolves service metadata via:
 #   1. Self-describing Sentry tags sent by the app:
-#      - tags.repository / tags.repo_url (e.g. "your-org/my-app")
+#      - tags.repository / tags.repo_url (e.g. "your-org/my-service")
 #      - tags.verification_command (e.g. "php artisan test")
 #      - tags.branch (e.g. "main")
 #   2. Convention auto-inference:

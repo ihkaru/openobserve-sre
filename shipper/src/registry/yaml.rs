@@ -120,7 +120,7 @@ impl AppRegistry for YamlAppRegistry {
             return meta.clone();
         }
 
-        let default_org = std::env::var("DEFAULT_GITHUB_ORG").unwrap_or_else(|_| "ihkaru".to_string());
+        let default_org = std::env::var("DEFAULT_GITHUB_ORG").unwrap_or_else(|_| "your-org".to_string());
         AppMetadata {
             app_name: app_name.to_string(),
             environment: "production".to_string(),

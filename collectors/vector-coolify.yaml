@@ -57,7 +57,7 @@ sinks:
     method: post
     auth:
       strategy: basic
-      user: "admin@yourdomain.com"
+      user: "admin@example.com"
       password: "<OPENOBSERVE_PASSWORD_OR_TOKEN>"
     encoding:
       codec: json

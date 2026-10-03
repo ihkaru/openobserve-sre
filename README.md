@@ -27,7 +27,7 @@ git clone https://github.com/ihkaru/openobserve-sre.git
 cd openobserve-sre
 docker compose up -d --build
 ```
-* **OpenObserve Web UI:** `http://localhost:5080` (Default credentials: `admin@yourdomain.com` / `ChangeThisPasswordSecure!`)
+* **OpenObserve Web UI:** `http://localhost:5080` (Default credentials: `admin@example.com` / `ChangeThisPasswordSecure!`)
 * **Rust Shipper API:** `http://localhost:8089` (Verify with `curl http://localhost:8089/healthz`)
 
 ---
@@ -339,7 +339,7 @@ environment: production
 platform: coolify
 language: python
 framework: fastapi
-repo_url: https://github.com/ihkaru/billing-service
+repo_url: https://github.com/your-org/billing-service
 default_branch: main
 verification_command: pytest tests/unit/
 ```
@@ -364,7 +364,7 @@ The Rust Shipper delivers an HTTP `POST` to `AGENT_TARGET_URL` with a context-ri
     "framework": "laravel",
     "repository": {
       "provider": "github",
-      "url": "https://github.com/ihkaru/toko-online-api",
+      "url": "https://github.com/your-org/toko-online-api",
       "default_branch": "main",
       "target_branch": "hotfix/auto-heal-evt_1727678900_a1b2c3"
     }
@@ -412,7 +412,7 @@ This repository is configured for native deployment on Coolify using the officia
      - `ZO_ROOT_USER_EMAIL`: OpenObserve administrator email.
      - `ZO_ROOT_USER_PASSWORD`: OpenObserve administrator password.
      - `AGENT_TARGET_URL`: Webhook URL of your coding agent worker.
-     - `DEFAULT_GITHUB_ORG`: Default GitHub username / organization (defaults to `ihkaru`).
+     - `DEFAULT_GITHUB_ORG`: Default GitHub username / organization (defaults to `your-org`).
 3. **Deploy:**
    * Click **Deploy** in Coolify.
    * Coolify provisions OpenObserve with persistent named storage (`openobserve_data`) and builds the lightweight Rust Shipper image (~15 MB).

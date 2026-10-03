@@ -52,7 +52,7 @@ Ketika insiden masuk ke SRE Context Shipper, metadata diekstrak dengan hierarki:
 
 ### Aturan Inferensi Tier 2:
 - **`app_name`**: Diambil dari segment terakhir DSN URL (contoh: `/my-app` ➔ `my-app`).
-- **`repository`**: `https://github.com/${DEFAULT_GITHUB_ORG:-ihkaru}/<app_name>`.
+- **`repository`**: `https://github.com/${DEFAULT_GITHUB_ORG:-your-org}/<app_name>`.
 - **`verification_command`**:
   - `php` / `laravel` ➔ `php artisan test`
   - `node` / `javascript` / `typescript` ➔ `npm test`

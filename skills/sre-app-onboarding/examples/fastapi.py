@@ -9,7 +9,7 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
 
 APP_NAME = os.getenv("APP_NAME_SLUG", "my-python-api")
-GITHUB_REPO = os.getenv("GITHUB_REPOSITORY", f"https://github.com/ihkaru/{APP_NAME}")
+GITHUB_REPO = os.getenv("GITHUB_REPOSITORY", f"https://github.com/your-org/{APP_NAME}")
 VERIFY_CMD = os.getenv("SRE_VERIFY_CMD", "pytest")
 BRANCH = os.getenv("GIT_BRANCH", "main")
 

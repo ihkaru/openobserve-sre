@@ -18,7 +18,7 @@ Panduan operasional resmi untuk mengintegrasikan aplikasi backend/frontend ke **
 1. **Stateless & Git-Clean**: Gateway SRE bekerja tanpa memerlukan file konfigurasi di server shipper (`apps.d/*.yaml`). Jangan pernah memasukkan file registri aplikasi ke Git.
 2. **Self-Describing Telemetry (Tier 1 SSOT)**: Metadata kritis (`app_name`, `repository`, `verification_command`, `branch`) disematkan langsung sebagai tag di SDK Sentry aplikasi.
 3. **Convention over Configuration (Tier 2 Fallback)**: Jika tag tidak lengkap, gateway secara otomatis menginferensi nama app dari rute DSN dan perintah verifikasi dari platform bahasa aplikasi.
-4. **Instant AI Auto-Triage**: Setiap insiden otomatis dikirimkan ke endpoint Aina (`https://aina.yourdomain.com/api/v1/events`) dan dinotifikasi ke WhatsApp pengembang.
+4. **Instant AI Auto-Triage**: Setiap insiden otomatis dikirimkan ke endpoint AI Agent (`https://agent.yourdomain.com/api/v1/events`) dan dinotifikasi ke WhatsApp pengembang.
 
 ---
 
@@ -74,9 +74,9 @@ Lihat template lengkap: [laravel.php](./examples/laravel.php)
 4. Tambahkan tag mandiri di `config/sentry.php`:
    ```php
    'tags' => [
-       'app_name' => 'my-app',
+       'app_name' => env('APP_NAME_SLUG', 'my-app'),
        'repository' => env('GITHUB_REPOSITORY', 'https://github.com/your-org/my-app'),
-       'verification_command' => 'php artisan test',
+       'verification_command' => env('SRE_VERIFY_CMD', 'php artisan test'),
        'branch' => env('GIT_BRANCH', 'main'),
    ],
    ```
@@ -101,7 +101,7 @@ Lihat template lengkap: [express.ts](./examples/express.ts)
      initialScope: {
        tags: {
          app_name: "my-app",
-         repository: "https://github.com/ihkaru/my-app",
+         repository: "https://github.com/your-org/my-app",
          verification_command: "npm test",
          branch: "main",
        },
@@ -126,7 +126,7 @@ Lihat template lengkap: [fastapi.py](./examples/fastapi.py)
    )
    with sentry_sdk.configure_scope() as scope:
        scope.set_tag("app_name", "my-python-app")
-       scope.set_tag("repository", "https://github.com/ihkaru/my-python-app")
+       scope.set_tag("repository", "https://github.com/your-org/my-python-app")
        scope.set_tag("verification_command", "pytest")
        scope.set_tag("branch", "main")
    ```
@@ -145,7 +145,7 @@ Lihat template lengkap: [golang.go](./examples/golang.go)
    })
    sentry.ConfigureScope(func(scope *sentry.Scope) {
        scope.SetTag("app_name", "my-go-service")
-       scope.SetTag("repository", "https://github.com/ihkaru/my-go-service")
+       scope.SetTag("repository", "https://github.com/your-org/my-go-service")
        scope.SetTag("verification_command", "go test ./...")
        scope.SetTag("branch", "main")
    })
@@ -165,7 +165,7 @@ Setelah konfigurasi diterapkan pada aplikasi:
    *Tanda Berhasil:*
    ```text
    INFO openobserve_shipper::api: Sentry envelope accepted from SDK event_id=... app_name=<app>
-   INFO openobserve_shipper::dispatchers::webhook: Dispatching incident payload to agent webhook event_id=... target=https://aina.yourdomain.com/api/v1/events
+   INFO openobserve_shipper::dispatchers::webhook: Dispatching incident payload to agent webhook event_id=... target=https://agent.yourdomain.com/api/v1/events
    INFO openobserve_shipper::dispatchers::webhook: Agent webhook response received status=202 Accepted
    ```
 3. **Periksa log AI Agent (Aina)**:

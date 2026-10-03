@@ -15,7 +15,7 @@ import (
 
 func initSentry() {
 	appName := getEnv("APP_NAME_SLUG", "my-go-service")
-	githubRepo := getEnv("GITHUB_REPOSITORY", "https://github.com/ihkaru/"+appName)
+	githubRepo := getEnv("GITHUB_REPOSITORY", "https://github.com/your-org/"+appName)
 	verifyCmd := getEnv("SRE_VERIFY_CMD", "go test ./...")
 	branch := getEnv("GIT_BRANCH", "main")
 
