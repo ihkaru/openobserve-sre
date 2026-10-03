@@ -13,3 +13,8 @@ shipper/target/
 Thumbs.db
 .idea/
 .vscode/
+
+# App Registry Overrides (server-only / sensitive)
+apps.d/*.yaml
+apps.d/*.yml
+!apps.d/app.yaml.example

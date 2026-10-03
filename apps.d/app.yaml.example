@@ -1,0 +1,26 @@
+# ==============================================================================
+# SRE App Registry Override Template (SERVER-ONLY / OPTIONAL)
+# ==============================================================================
+# NOTE: You do NOT need this file for standard services!
+# The SRE Gateway automatically resolves service metadata via:
+#   1. Self-describing Sentry tags sent by the app:
+#      - tags.repository / tags.repo_url (e.g. "your-org/my-app")
+#      - tags.verification_command (e.g. "php artisan test")
+#      - tags.branch (e.g. "main")
+#   2. Convention auto-inference:
+#      - DSN path: https://public@sre.yourdomain.com/<app_name>
+#      - Repo: https://github.com/${DEFAULT_GITHUB_ORG}/<app_name>
+#      - Test command: inferred from platform/language (php artisan test, pytest, etc.)
+#
+# Only create a <app_name>.yaml file here if you need a non-standard local override
+# that cannot be sent via Sentry tags. All *.yaml files in apps.d are ignored by Git.
+# ==============================================================================
+
+app_name: my-custom-service
+environment: production
+platform: coolify
+language: php
+framework: laravel
+repo_url: https://github.com/my-org/my-custom-service
+default_branch: main
+verification_command: php artisan test
