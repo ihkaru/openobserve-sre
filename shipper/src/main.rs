@@ -81,24 +81,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let registry = Arc::new(registry_builder);
 
     // 4. Dispatcher (Interface Segregation Principle)
-    let target_url = config_data
-        .agent_dispatch
-        .as_ref()
-        .and_then(|d| d.target_url.clone())
+    let target_url = env::var("AGENT_TARGET_URL")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .or_else(|| config_data.agent_dispatch.as_ref().and_then(|d| d.target_url.clone()))
         .unwrap_or_else(|| "http://localhost:8000/webhook/agent-remediation".to_string());
 
-    let auth_token = config_data
-        .agent_dispatch
-        .as_ref()
-        .and_then(|d| d.auth_token.clone());
+    let auth_token = env::var("AGENT_AUTH_TOKEN")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .or_else(|| config_data.agent_dispatch.as_ref().and_then(|d| d.auth_token.clone()));
 
     let dispatcher = Arc::new(WebhookDispatcher::new(target_url, auth_token, 15));
 
     // 5. Orchestrator (Dependency Inversion Principle)
-    let cooldown_secs = config_data
-        .deduplication
-        .as_ref()
-        .and_then(|d| d.cooldown_seconds)
+    let cooldown_secs = env::var("DEDUP_COOLDOWN_SECONDS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .or_else(|| config_data.deduplication.as_ref().and_then(|d| d.cooldown_seconds))
         .unwrap_or(1800);
 
     let orchestrator = Arc::new(IncidentOrchestrator::new(
