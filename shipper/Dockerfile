@@ -6,10 +6,11 @@ COPY . .
 RUN cargo build --release
 
 FROM alpine:3.20
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates && mkdir -p /app/apps.d
 WORKDIR /app
 COPY --from=builder /usr/src/shipper/target/release/openobserve-shipper /app/shipper
 COPY config.yaml /app/config.yaml
 ENV CONFIG_PATH=/app/config.yaml
+ENV APPS_DIR=/app/apps.d
 EXPOSE 8089
 ENTRYPOINT ["/app/shipper"]

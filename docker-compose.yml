@@ -36,9 +36,6 @@ services:
       - OPENOBSERVE_AUTH_TOKEN=${OPENOBSERVE_AUTH_TOKEN:-YWRtaW5AZHZscGlkLm15LmlkOkNoYW5nZVRoaXNQYXNzd29yZEFkbWluMjAyNiE=}
     ports:
       - "${SHIPPER_PORT:-8089}:8089"
-    volumes:
-      - ./shipper/config.yaml:/app/config.yaml:ro
-      - ./apps.d:/app/apps.d:ro
     networks:
       - sre_net
     depends_on:
