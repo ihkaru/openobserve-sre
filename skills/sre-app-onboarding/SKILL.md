@@ -40,16 +40,38 @@ SENTRY_DSN=https://public@sre.yourdomain.com/my-app
 
 ---
 
-## 🏷️ Tag Telemetri Mandiri (Wajib Diterapkan)
+## 🏷️ Tag & Konteks Telemetri Mandiri (Self-Describing Telemetry)
 
-Sematkan tag berikut pada inisialisasi Sentry SDK:
+Sematkan tag dan konteks berikut pada inisialisasi Sentry SDK. Informasi ini menjadi bahan bakar utama bagi **AI Coding Agent (Aina)** untuk menganalisis dan mereproduksi insiden secara presisi tanpa salah diagnosa (*hallucination / false lead*).
 
+### 1. Tag Inti (Core Identity Tags)
 | Tag Key | Wajib/Rekomendasi | Deskripsi | Contoh Nilai |
 | :--- | :--- | :--- | :--- |
-| `app_name` | **Wajib** | Slug nama aplikasi | `my-app`, `billing-service` |
+| `app_name` | **Wajib** | Slug unik nama aplikasi | `my-app`, `billing-service` |
 | `repository` | **Sangat Dianjurkan** | URL repositori GitHub | `https://github.com/your-org/my-app` |
 | `verification_command` | **Sangat Dianjurkan** | Perintah test untuk AI Agent | `php artisan test`, `npm test`, `pytest` |
 | `branch` | Opsional | Target branch default | `main` |
+
+### 2. Konteks Deployment (Deployment & Runtime Context)
+Membantu AI Agent membedakan apakah error merupakan bug logika murni atau **transient deployment race condition** (misal: migrasi database belum tuntas, OPcache/Octane worker desync, atau Vite chunk hash mismatch sesaat setelah rilis).
+
+| Tag / Field | Level | Deskripsi | Contoh Nilai |
+| :--- | :--- | :--- | :--- |
+| `release` | **Sangat Dianjurkan** | Git commit SHA atau tag rilis | `git.8925a9e`, `v1.2.0` |
+| `environment` | **Sangat Dianjurkan** | Lingkungan eksekusi | `production`, `staging`, `local` |
+| `deployment_target` | Rekomendasi | Platform deployment / orchestrator | `coolify`, `docker-compose`, `k8s`, `bare-metal` |
+| `runtime` | Rekomendasi | Engine / runtime aplikasi aktif | `frankenphp-octane`, `php-fpm`, `node:20-alpine`, `bun:1.1` |
+
+### 3. Konteks Device & Network (Khusus Frontend / Mobile / PWA)
+Mencegah AI Agent terjebak memodifikasi logic bisnis ketika error sebenarnya disebabkan oleh **quirk versi browser/device lama** (butuh polyfill) atau **kehilangan sinyal network**.
+
+| Tag / Field | Level | Deskripsi | Contoh Nilai |
+| :--- | :--- | :--- | :--- |
+| `device_platform` | **Sangat Dianjurkan** | Platform eksekusi client | `android`, `ios`, `browser`, `electron` |
+| `device_model` | Rekomendasi | Model fisik perangkat | `Samsung SM-A055F`, `iPhone 15 Pro`, `Desktop Chrome` |
+| `os_version` | Rekomendasi | Versi sistem operasi client | `Android 13`, `iOS 17.4`, `Windows 11` |
+| `network_type` | Rekomendasi | Status konektivitas saat error | `wifi`, `cellular-4g`, `offline` |
+| `is_native` | Rekomendasi | Apakah berjalan dalam wrapper natif | `true` (Capacitor/Cordova) / `false` (Web) |
 
 ---
 
@@ -142,13 +164,50 @@ Lihat template lengkap: [golang.go](./examples/golang.go)
    ```go
    sentry.Init(sentry.ClientOptions{
        Dsn: "https://public@sre.yourdomain.com/my-go-service",
+       Release: "git." + os.Getenv("GIT_COMMIT"),
+       Environment: os.Getenv("APP_ENV"),
    })
    sentry.ConfigureScope(func(scope *sentry.Scope) {
        scope.SetTag("app_name", "my-go-service")
        scope.SetTag("repository", "https://github.com/your-org/my-go-service")
        scope.SetTag("verification_command", "go test ./...")
        scope.SetTag("branch", "main")
+       scope.SetTag("runtime", "go" + runtime.Version())
    })
+   ```
+
+### 5. Frontend SPA & Mobile Client (Vue.js / Capacitor / Offline-First)
+Lihat template lengkap: [client-vue.ts](./examples/client-vue.ts)
+
+1. Pasang dependensi:
+   ```bash
+   npm install @sentry/vue
+   # Opsional jika native mobile (Capacitor):
+   npm install @capacitor/device @capacitor/network @capacitor/app
+   ```
+2. Inisialisasi dengan Offline-First IndexedDB Transport & Device Context:
+   ```typescript
+   import * as Sentry from "@sentry/vue";
+   import { makeBrowserOfflineTransport, makeFetchTransport } from "@sentry/browser";
+
+   Sentry.init({
+     app,
+     dsn: import.meta.env.VITE_SENTRY_DSN || "https://public@sre.yourdomain.com/my-client-app",
+     release: import.meta.env.VITE_APP_VERSION || "my-client-app@1.0.0",
+     // Menyimpan envelope ke IndexedDB jika device offline & auto-flush saat online
+     transport: makeBrowserOfflineTransport(makeFetchTransport),
+     initialScope: {
+       tags: {
+         app_name: "my-client-app",
+         repository: "https://github.com/your-org/my-client-app",
+         verification_command: "npm test",
+         branch: "main",
+         device_platform: "android", // atau diisi dinamis via Capacitor Device.getInfo()
+         device_model: "Samsung SM-A055F",
+         is_native: "true",
+       },
+     },
+   });
    ```
 
 ---

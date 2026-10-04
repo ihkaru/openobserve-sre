@@ -19,6 +19,14 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Release & Deployment Context
+    |--------------------------------------------------------------------------
+    */
+    'release' => env('APP_COMMIT', env('GIT_COMMIT', 'git.unknown')),
+    'environment' => env('APP_ENV', 'production'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Self-Describing SRE Telemetry Tags (Tier 1 SSOT)
     |--------------------------------------------------------------------------
     |
@@ -31,6 +39,8 @@ return [
         'repository' => env('GITHUB_REPOSITORY', 'https://github.com/your-org/my-app'),
         'verification_command' => env('SRE_VERIFY_CMD', 'php artisan test'),
         'branch' => env('GIT_BRANCH', 'main'),
+        'runtime' => env('APP_RUNTIME', 'frankenphp-octane'),
+        'deployment_target' => env('DEPLOYMENT_TARGET', 'coolify'),
     ],
 
     /*
